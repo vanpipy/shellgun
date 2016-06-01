@@ -1,11 +1,19 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 WHOAMI=$0
-POCKET=./pocket
-COMMANDER=/bin/sh
+COMMANDER=/bin/bash
 
-validBullet=`ls $POCKET`
+SOURCE="${BASH_SOURCE[0]}"
+TARGET="$(readlink "$SOURCE")"
+DIR="$(dirname "$TARGET")"
+POCKET=pocket
 
-$COMMANDER $@
+vaildBullet=`ls $DIR/$POCKET`
+bullet=$1
 
-
+for each in $vaildBullet; do
+    if [[ "$each" =~ $bullet ]]; then
+        $COMMANDER $DIR/$POCKET/$each
+        break
+    fi
+done
