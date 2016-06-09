@@ -11,9 +11,13 @@ POCKET=pocket
 vaildBullet=`ls $DIR/$POCKET`
 bullet=$1
 
-for each in $vaildBullet; do
-    if [[ "$each" =~ $bullet ]]; then
-        $COMMANDER $DIR/$POCKET/$each
-        break
-    fi
-done
+function main() {
+    for each in $vaildBullet; do
+        if [[ "$each" =~ $bullet ]]; then
+            $COMMANDER $DIR/$POCKET/$each
+            break
+        fi
+    done
+}
+
+main
