@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+usage() {
+cat <<HERE
+usage: shellgun help      # list all availd command.
+   or: shellgun           # show all error.
+HERE
+}
+
+usage

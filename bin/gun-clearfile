@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+RemoveDir=$1
+
+function main() {
+    read -p "Are you sure to remove all files under $RemoveDir - yes?" ensure
+    if [[ "$ensure" = "yes" ]]; then
+        rm $RemoveDir/*.*
+    else
+        echo 'Remove failed.'
+        exit 0
+    fi
+}
+
+main

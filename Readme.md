@@ -1,7 +1,7 @@
 # Shell Gun
 
-Shell gun -- A gun, a pocket, there left a target.
+Custom shell command like a gun.
 
-# Important help
+# Some help
 
-But here is some help -- [Advanced Bash-Scripting Guide](http://www.tldp.org/LDP/abs/html/)
+Here is some help -- [Advanced Bash-Scripting Guide](http://www.tldp.org/LDP/abs/html/)
