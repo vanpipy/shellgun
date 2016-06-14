@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+function main() {
+    LIST=$(ls $(dirname $0) | grep ^gun)
+    echo "Vaild shell gun command below: "
+    for each in $LIST; do
+        echo --${each:4:${#each}}
+    done
+}
+
+main

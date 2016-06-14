@@ -2,8 +2,8 @@
 
 usage() {
 cat <<HERE
-usage: shellgun help      # list all availd command.
-   or: shellgun           # show all error.
+usage: shellgun --help        # list all availd command.
+   or: shellgun --list        # show all error.
 HERE
 }
 
