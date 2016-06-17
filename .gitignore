@@ -2,3 +2,7 @@
 *.swp*
 *.pyc
 *NERD*
+
+bin/gun-*
+!bin/gun-help
+!bin/gun-list
