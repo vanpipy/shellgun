@@ -1,7 +1,0 @@
-#!/usr/bin/env bash  
-
-DIR=/home/van/file/XX-Net
-cd $DIR; ./start.sh
-
-clear
-echo "$DIR xx-net proxy disabled with ctrl-c or other time out."

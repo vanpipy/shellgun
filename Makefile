@@ -10,6 +10,8 @@ install:
 uninstall:
 	@echo "Uninstall..."
 	@rm -f $(BINPREFIX)/shellgun $(BINPREFIX)/gun-*
+	@echo
+	@echo "Completed."
 
 clean:
 	@echo "Make clean..."
