@@ -3,6 +3,4 @@
 *.pyc
 *NERD*
 
-bin/gun-*
-!bin/gun-help
-!bin/gun-list
+bin/local*
