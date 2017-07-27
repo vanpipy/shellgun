@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 
-function main() {
-    currentBransh=$(git branch --no-color | grep "\*" | awk '{print $2}')
-    if [[ -n currentBransh ]]; then
-        echo "The $currentBransh is pushing to remote - origin"
-        git push origin $currentBransh
-    fi
-}
+currentBransh=$(git branch --no-color | grep "\*" | awk '{print $2}')
 
-main
+if [ -n currentBransh ]; then
+    echo "The $currentBransh is pushing to remote - origin"
+    git push origin $currentBransh
+fi
