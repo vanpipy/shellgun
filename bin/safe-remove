@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+files=$@
+
+echo "Do you want to remove the files below? y/N:"
+echo "$files"
+
+read remove
+
+if [ "$remove" = "y" ]; then
+    rm -f $files
+fi
