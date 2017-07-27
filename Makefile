@@ -9,7 +9,7 @@ install:
 
 uninstall:
 	@echo "Uninstall..."
-	@rm -f $(BINPREFIX)/shellgun $(BINPREFIX)/gun-*
+	@ls ./bin | xargs -I {} rm "$(BINPREFIX)/{}"
 	@echo
 	@echo "Completed."
 
