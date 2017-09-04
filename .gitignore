@@ -3,4 +3,4 @@
 *.pyc
 *NERD*
 
-bin/local*
+bin/*local*
