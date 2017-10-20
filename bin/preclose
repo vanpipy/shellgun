@@ -1,0 +1,11 @@
+#!/usr/bin/expect
+
+set PASSWORD $argv
+
+spawn /usr/bin/sudo shutdown -h 120
+
+expect "password"
+
+send "$PASSWORD\r"
+
+interact
