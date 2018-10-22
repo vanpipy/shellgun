@@ -22,11 +22,15 @@ fi
 
 # Find all about $XXNET in processor cause no valid processor name.
 # And the command ps give result include the ps itself, so the xxnetprocessornumber is greater than 1 always.
-# The reason I cared is how many xxnet processor running, so using command 'wc -l' to count it.
+# The question I cared is how many xxnet processor running, so using command 'wc -l' to count it.
 xxnetprocessorNumber="$(ps -aux | grep $XXNET | wc -l)"
 if [ "$xxnetprocessorNumber" -eq "1" ]; then
     sudo $XXNET/xx_net.sh
+
+    # Ensure $XXNET/xx_net.sh process exists before trying to run $XXNET/start.
+    # Because the $XXNET/start come from the $XXNET/xx_net.sh died.
     sleep 1
+
     sudo $XXNET/start 2>/dev/null &
 else    
     echo "XX-Net is under working already"
