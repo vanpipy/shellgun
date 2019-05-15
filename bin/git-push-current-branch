@@ -2,13 +2,13 @@
 
 currentBransh=$(git branch --no-color | grep "\*" | awk '{print $2}')
 origin=$(git remote get-url origin)
-forceToPush=$1
+option=$1
 
 if [ -n "$currentBransh" ]; then
     echo "The $currentBransh is pushing to remote - $origin"
 
-    if [ -n $forceToPush ]; then
-        git push origin $currentBransh $forceToPush
+    if [ -n $option ]; then
+        git push origin $currentBransh $option
     else
         git push origin $currentBransh
     fi
