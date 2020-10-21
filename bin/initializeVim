@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+$SOURCE=../source
+$AUTOLOAD=$HOME/.vim/autoload
+
+function copyPlugvim() {
+    cp $SOURCE/plug.vim $AUTOLOAD;
+}
+
+function copyVimrc() {
+    cp $SOURCE/vimrc ~/.vimrc
+}
+
+function initVimDeps() {
+    copyVimrc;
+
+    echo "Please wait the plug installing..."
+    vi -es -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
+    echo "Done."
+}
+
+function initPlugvim() {
+    if [[ ! -d "$AUTOLOAD" ]]; then
+        mkdir $AUTOLOAD;
+        copyPlugvim;
+        initVimDeps;
+    else
+        if [[ -f "$AUTOLOAD/plug.vim" ]]; then
+            echo "Your vim installed with the plug already."
+            return 0;
+        else
+            copyPlugvim;
+            initVimDeps;
+        fi
+    fi
+
+    return 0;
+}
+
+initPlugvim;
