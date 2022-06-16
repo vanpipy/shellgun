@@ -1,40 +1,62 @@
 #!/usr/bin/env bash
 
-$SOURCE=../source
-$AUTOLOAD=$HOME/.vim/autoload
+hasVim=0
 
-function copyPlugvim() {
-    cp $SOURCE/plug.vim $AUTOLOAD;
-}
-
-function copyVimrc() {
-    cp $SOURCE/vimrc ~/.vimrc
-}
-
-function initVimDeps() {
-    copyVimrc;
-
-    echo "Please wait the plug installing..."
-    vi -es -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
-    echo "Done."
-}
-
-function initPlugvim() {
-    if [[ ! -d "$AUTOLOAD" ]]; then
-        mkdir $AUTOLOAD;
-        copyPlugvim;
-        initVimDeps;
+function checkVim() {
+    if [ -x "$(command -v vim)" ]; then
+        hasVim=1
     else
-        if [[ -f "$AUTOLOAD/plug.vim" ]]; then
-            echo "Your vim installed with the plug already."
-            return 0;
-        else
-            copyPlugvim;
-            initVimDeps;
-        fi
+        hasVim=0
     fi
-
-    return 0;
 }
 
-initPlugvim;
+function installPlug() {
+    echo
+    echo "Download the plug.vim..."
+    echo
+
+    curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+        https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
+
+    echo
+    echo "Done"
+}
+
+function installVimrc() {
+    echo
+    echo "Download the vimrc..."
+    echo
+
+    curl -fLo ~/.vimrc \
+        https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/589b703da43de98e38c09387ef65a077f2d3d111/vimrc
+
+    echo
+    echo "Done"
+}
+
+function installPlugins() {
+    echo
+    echo "Install plugins..."
+    echo
+
+    vi -e -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
+
+    echo
+    echo "Done"
+}
+
+function install() {
+    checkVim
+
+    if [ "$hasVim" -eq 1 ]; then
+        installPlug
+        installVimrc
+        installPlugins
+    else
+        echo
+        echo "The vim cannot be found, please install it first"
+        echo "Your can visit https://www.vim.org/download.php"
+    fi
+}
+
+install;
