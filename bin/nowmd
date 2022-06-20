@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TOUCHED="$(date "+%Y-%m-%d_%H:%M:%S")"
+TOUCHED=$(date "+%Y-%m-%d")
 filename="$TOUCHED.md"
 
 echo ">> The time you touched is $(date "+%Y-%m-%d %H:%M:%S")"
