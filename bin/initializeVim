@@ -45,6 +45,16 @@ function installPlugins() {
     echo "Done"
 }
 
+function installCocPlugins() {
+    echo
+    echo "Install Coc plugins..."
+    echo
+
+    vi -e -u ~/.vimrc -i NONE \
+        -c "CocInstall coc-tsserver coc-rome coc-eslint coc-json coc-git coc-cmake" \
+        -c "qa"
+}
+
 function install() {
     checkVim
 
@@ -52,6 +62,7 @@ function install() {
         installPlug
         installVimrc
         installPlugins
+        installCocPlugins
     else
         echo
         echo "The vim cannot be found, please install it first"
