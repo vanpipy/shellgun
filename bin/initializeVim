@@ -34,25 +34,15 @@ function installVimrc() {
     echo "Done"
 }
 
-function installPlugins() {
+function initilizePlugins() {
     echo
-    echo "Install plugins..."
-    echo
-
-    vi -e -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
-
-    echo
-    echo "Done"
-}
-
-function installCocPlugins() {
-    echo
-    echo "Install Coc plugins..."
+    echo "Plugins is initilizing"
     echo
 
-    vi -e -u ~/.vimrc -i NONE \
-        -c "CocInstall coc-tsserver coc-rome coc-eslint coc-json coc-git coc-cmake" \
-        -c "qa"
+    vi -e -u ~/.vimrc -i NONE -c "PlugInstall" -c "CocInstall -sync coc-tsserver coc-rome coc-eslint coc-json coc-git coc-cmake" -c "qa"
+
+    echo
+    echo "Finished"
 }
 
 function install() {
@@ -61,8 +51,7 @@ function install() {
     if [ "$hasVim" -eq 1 ]; then
         installPlug
         installVimrc
-        installPlugins
-        installCocPlugins
+        initilizePlugins
     else
         echo
         echo "The vim cannot be found, please install it first"
