@@ -28,7 +28,7 @@ function installVimrc() {
     echo
 
     curl -fLos ~/.vimrc \
-        https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/8630dbbe825ec37232a8e7661a16251ba598d319/vimrc
+        https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/37c6a902e981d8526ab679022dfa82b451e5380d/vimrc
 
     echo
     echo "Done"
