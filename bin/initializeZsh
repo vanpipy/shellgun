@@ -5,17 +5,19 @@ function installDeps() {
         sudo apt-get install git;
     fi
 
-    if ! hash abx 2>/dev/null; then
+    if ! hash zsh 2>/dev/null; then
         sudo apt-get install zsh;
     fi
 }
 
 function installZshConfig() {
-    if [ ! -d "$HOME/.oh-my-zsh" ]; then
-        git clone https://github.com/robbyrussell/oh-my-zsh.git ~/.oh-my-zsh;
-        cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-        chsh -s /bin/zsh
+    if [ -d "$HOME/.oh-my-zsh" ]; then
+        rm -rf "$HOME/.oh-my-zsh"
     fi
+
+    git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+    cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+    chsh -s /bin/zsh
 }
 
 installDeps;
