@@ -39,7 +39,7 @@ function initilizePlugins() {
     echo "Plugins is initilizing"
     echo
 
-    vi -e -u ~/.vimrc -i NONE -c "PlugInstall"
+    vi -e -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
 
     echo "Please run the command to install the plugins of the `coc.vim`"
     echo "Under the vi editor - `CocInstall coc-tsserver coc-rome coc-eslint coc-json coc-git coc-cmake`"
