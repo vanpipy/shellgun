@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+function installZsh() {
+    if [ ! hash git 2>/dev/null ]; then
+        sudo apt install git;
+    fi
+
+    if [ ! hash zsh 2>/dev/null ]; then
+        sudo apt install zsh;
+    fi
+
+    if [ -d "$HOME/.oh-my-zsh" ]; then
+        rm -rf "$HOME/.oh-my-zsh"
+    fi
+
+    git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+    cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+    chsh -s /bin/zsh
+}
+
+function installTmux() {
+    if [ ! hash tmux 2>/dev/null ]; then
+        sudo apt install tmux
+    fi
+
+    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+
+    echo "Download tmux config"
+    echo
+    curl -o ~/.tmux.config https://gist.githubusercontent.com/vanpipy/47847ac668f6514c16f1c650f0495724/raw/42ba4587de3776b8fddbbbe23e81ce4c1cfa5fca/tmux.config
+    echo
+    echo "Finished"
+}
+
+function installNode() {
+    if [ -d "$HOME/Clone/n" ]; then
+        rm -rf "$HOME/Clone/n"
+    fi
+
+    git clone https://github.com/tj/n.git ~/Clone/n
+    cd ~/Clone/n
+    sudo make
+    cd -
+    source ~/.zshrc
+    sudo n 16.15.0
+}
+
+function installVim() {
+    sudo add-apt-repository ppa:jonathonf/vim
+    sudo apt install vim
+
+    echo "Download plug.vim"
+    echo
+    curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
+    echo
+    echo "Finished"
+
+    echo "Download vimrc"
+    echo
+    curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/9ce290c9465b149b832c62a62bf3d8ab0d334574/vimrc
+    echo
+    echo "Finished"
+
+    echo "Install the vim plugins"
+    echo
+    vi -e -u ~/.vimrc -i NONE -c "PlugInstall" -c "qa"
+    echo
+    echo "Finished"
+
+    echo "Please run the command to install the plugins of the `coc.vim`"
+    echo "Under the vi editor - `CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake`"
+}
+
+installZsh
+installTmux
+installNode
+installVim
