@@ -5,7 +5,7 @@ default: install
 
 install: 
 	@echo "Install bins to $(BINPREFIX)"
-	@cp -f ./bin/* $(BINPREFIX)
+	@ls ./bin | grep "^git" | xargs -I {} cp ./bin/{} $(BINPREFIX)/{}
 
 uninstall:
 	@echo "Uninstall..."
