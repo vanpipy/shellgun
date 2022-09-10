@@ -27,18 +27,20 @@ function installTmux() {
 
     echo "Download tmux config"
     echo
-    curl -o ~/.tmux.config https://gist.githubusercontent.com/vanpipy/47847ac668f6514c16f1c650f0495724/raw/42ba4587de3776b8fddbbbe23e81ce4c1cfa5fca/tmux.config
+    curl -o ~/.tmux.conf https://gist.githubusercontent.com/vanpipy/47847ac668f6514c16f1c650f0495724/raw/42ba4587de3776b8fddbbbe23e81ce4c1cfa5fca/tmux.config
     echo
     echo "Finished"
 }
 
 function installNode() {
-    if [ -d "$HOME/Clone/n" ]; then
-        rm -rf "$HOME/Clone/n"
+    nodeDir="$HOME/Project/n"
+
+    if [ -d "$nodeDir" ]; then
+        rm -rf "$nodeDir"
     fi
 
-    git clone https://github.com/tj/n.git ~/Clone/n
-    cd ~/Clone/n
+    git clone https://github.com/tj/n.git $nodeDir
+    cd $nodeDir
     sudo make
     cd -
     source ~/.zshrc
