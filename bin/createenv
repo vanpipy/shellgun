@@ -40,6 +40,7 @@ function install() {
     echo "You would better to install the plugins by yourself"
     echo "1. :PlugInstall"
     echo "2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake"
+    echo "3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
     echo "Done"
 }
 
