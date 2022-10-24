@@ -17,6 +17,9 @@ function install() {
     echo "Install ohmytmux"
     git clone https://github.com/gpakosz/.tmux.git ~/.tmux
     ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+    echo
+    echo "The script `sudo systemd-tmpfiles --create` will be helpful when `error creating /run/tmux/1000 (No such file or directory)` was catched under WSL"
+    echo "Or just change add `export TMUX_TMPDIR='/tmp'` into .zshrc to change the default tmux tmp directory"
     echo "Done"
 
     echo "Install ohmyzsh"
