@@ -4,47 +4,54 @@ function install() {
     system=$(cat /etc/os-release | grep NAME)
     runner="zypper"
 
-    echo "The openSUSE is the default choice"
-    echo "And your system is"
-    echo $system
+    if [[ $system == *"Ubuntu"* ]]; then
+        runner="apt"
+    fi
+
+    echo "The openSUSE is the default choice and support ubuntu,"
+    echo "And your system is,"
     echo
-    echo "So use zypper to install dependency"
+    echo ">> $system"
+    echo
+    echo ">> So use $runner to install dependency"
+    echo ">> Install pre-dependencies"
 
-    echo "Install pre-dependencies"
-
+    echo ">> $runner install git tmux tree cmake gcc zsh"
     sudo $runner install git tmux tree cmake gcc zsh
 
-    echo "Install ohmytmux"
+    echo ">> Install ohmytmux"
     git clone https://github.com/gpakosz/.tmux.git ~/.tmux
     ln -s -f .tmux/.tmux.conf ~/.tmux.conf
     echo
-    echo "The script `sudo systemd-tmpfiles --create` will be helpful when `error creating /run/tmux/1000 (No such file or directory)` was catched under WSL"
-    echo "Or just change add `export TMUX_TMPDIR='/tmp'` into .zshrc to change the default tmux tmp directory"
-    echo "Done"
+    echo ">> The script `sudo systemd-tmpfiles --create` will be helpful when `error creating /run/tmux/1000 (No such file or directory)` was catched under WSL"
+    echo ">> Or just change add `export TMUX_TMPDIR='/tmp'` into .zshrc to change the default tmux tmp directory"
+    echo ">> Done"
 
-    echo "Install ohmyzsh"
+    echo ">> Install ohmyzsh"
     git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
     cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
     chsh -s /bin/zsh
-    echo "Done"
+    echo ">> Done"
 
-    echo "Install node version manager and one node"
+    echo ">> Install node version manager and one node"
     git clone https://github.com/tj/n.git ~/Project/n
     cd ~/Project/n
     sudo make
     cd -
     source ~/.zshrc
     sudo n 16.15.0
-    echo "Done"
+    echo ">> Done"
 
-    echo "Install vimrc"
+    echo ">> Install vimrc"
     curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
     curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/0e75427494179de795530d23b49c03afb42c75b4/vimrc
-    echo "You would better to install the plugins by yourself"
-    echo "1. :PlugInstall"
-    echo "2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake"
-    echo "3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
-    echo "Done"
+    echo ">> You would better to install the plugins by yourself"
+    echo ">> 1. :PlugInstall"
+    echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake"
+    echo ">> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
+    echo ">> Done"
+
+    exit 0
 }
 
 install
