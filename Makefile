@@ -9,7 +9,7 @@ install:
 
 uninstall:
 	@echo "Uninstall..."
-	@ls ./bin | xargs -I {} rm "$(BINPREFIX)/{}"
+	@ls ./bin | grep "^git" | xargs -I {} rm "$(BINPREFIX)/{}"
 	@echo
 	@echo "Completed."
 
