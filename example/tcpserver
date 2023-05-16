@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+import socket
+import threading
+
+target_host = '0.0.0.0'
+target_port = 9000
+target_listen_count = 5
+
+def handle_client(client):
+    request = client.recv(4096)
+    print(f"[*] Received {request.decode('utf-8')}")
+    client.send(b"ACK")
+
+def listen(server):
+    server.bind((target_host, target_port))
+    server.listen(target_listen_count)
+
+    print(f"[*] Server is listenning at {target_host}:{target_port} and max listen count is {target_listen_count}")
+
+    while True:
+        client, address = server.accept()
+        print(f"[*] Accepted connection from {address[0]}:{address[1]}")
+        client_handle = threading.Thread(target=handle_client, args=(client,))
+        client_handle.start()
+
+if __name__ == '__main__':
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen(server=server)
