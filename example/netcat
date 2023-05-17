@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+import argparse
+import textwrap
+import subprocess
+import shlex
+import sys
+import socket
+from operator import attrgetter
+import threading
+
+def parseArgs():
+    parser = argparse.ArgumentParser(
+        description="BHP Net Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent('''Example:
+            netcat -t 192.168.1.108 -p 5555 -l -c #command shell
+            netcat -t 192.168.1.108 -p 5555 -l -u=test.txt #upload to file
+            netcat -t 192.168.1.108 -p 5555 -l -e=\"cat /etc/passwd\" #execute the command
+            echo 'ABC' | netcat -t 192.168.1.108 -p 135 #echo text to 192.168.1.108:135
+            netcat -t 192.168.1.108 -p 5555 #connect to server
+            '''))
+    parser.add_argument('-c', '--command', action='store_true', help='command shell')
+    parser.add_argument('-e', '--execute', help='execute specified command')
+    parser.add_argument('-l', '--listen', action='store_true', help='listen')
+    parser.add_argument('-p', '--port', type=int, help='specified port')
+    parser.add_argument('-t', '--target', default='127.0.0.1', help='specified IP')
+    parser.add_argument('-u', '--upload', help='upload to file')
+
+    return parser.parse_args()
+
+def executeCommand(cmd):
+    cmd = cmd.strip()
+    if not cmd:
+        return
+    output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT)
+    return output.decode()
+
+class Netcat:
+    def __init__(self, args, buffer=None):
+        self.args = args
+        self.buffer = buffer
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    def run(self):
+        if self.args.listen:
+            self.listen()
+        else:
+            self.send()
+
+    def listen(self):
+        target, port = attrgetter('target', 'port')(self.args)
+        server = self.socket
+
+        server.bind((target, port))
+        server.listen(5)
+
+        print(f'[*] Listening at {target}:{port}')
+
+        while True:
+            client_socket, address = server.accept()
+            print(f"[*] Acceptd connection from {address[0]}:{address[1]}")
+            client_thread = threading.Thread(target=self.handle, args=(client_socket,))
+            client_thread.start()
+
+    def send(self):
+        target, port = attrgetter('target', 'port')(self.args)
+        client = self.socket
+        client.connect((target, port))
+        if self.buffer:
+            client.send(self.buffer.encode())
+        try:
+            while True:
+                recv_len = 1
+                response = ''
+                while recv_len:
+                    data = client.recv((4096))
+                    response += data.decode()
+                    recv_len = len(data)
+                    if recv_len < 4096:
+                        break
+                if response:
+                    print(response)
+                    buffer = input('> ')
+                    buffer += '\n'
+                    client.send(buffer.encode())
+        except KeyboardInterrupt:
+            print('User terminated')
+            client.close()
+            sys.exit()
+
+    def handle(self, client_socket):
+        command, execute, upload = attrgetter('command', 'execute', 'upload')(self.args)
+
+        if command:
+            cmd_buffer = b''
+            while True:
+                try:
+                    client_socket.send(b'BHP: #>')
+                    while '\n' not in cmd_buffer.decode():
+                        cmd_buffer += client_socket.recv(64)
+                    response = executeCommand(cmd_buffer.decode())
+                    if response:
+                        client_socket.send(response.encode())
+                    cmd_buffer = b''
+                except Exception as e:
+                    print(f'server killed {e}')
+                    self.socket.close()
+                    sys.exit()
+
+        if execute:
+            response = executeCommand(execute)
+            client_socket.send(response.encode())
+
+        if upload:
+            file_buffer = b''
+            while True:
+                data = client_socket.recv(4096)
+                if data:
+                    file_buffer += data
+                else:
+                    break
+
+            with open(upload, 'wb') as f:
+                f.write(file_buffer)
+
+            message = f'Saved at file {upload}'
+            client_socket.send(message.encode())
+
+if __name__ == '__main__':
+    args = parseArgs()
+
+    if args.listen:
+        buffer = ''
+    else:
+        buffer = sys.stdin.read()
+
+    nc = Netcat(args, buffer)
+    nc.run()
