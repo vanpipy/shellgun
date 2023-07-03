@@ -44,7 +44,7 @@ function install() {
 
     echo ">> Install vimrc"
     curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
-    curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/5592f958baf8926b7c859ddabfd0c73532b01002/vimrc
+    curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/bb05182836ba73d7e75ab08ce9c4ad7b4a241cf1/vimrc
     echo ">> You would better to install the plugins by yourself"
     echo ">> 1. :PlugInstall"
     echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake"
