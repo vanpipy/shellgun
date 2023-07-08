@@ -40,6 +40,11 @@ function install() {
     cd -
     source ~/.zshrc
     sudo n 16.15.0
+    echo "The install maybe failed with the blocked network, try to switch the mirror export N_NODE_MIRROR=https://npmmirror.com/mirrors/node"
+    echo "And the N_NODE_MIRROR maybe did not work cause the sudoer rule"
+    echo "Add the Defaults env_keep += \"N_NODE_MIRROR\" to make it work as wish"
+    echo "And the install will be failed again cause the sudo n cannot be found cause the sudo PATH did not include the installed path /usr/local/bin"
+    echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
     echo ">> Done"
 
     echo ">> Install vimrc"
