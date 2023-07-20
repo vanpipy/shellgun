@@ -3,12 +3,12 @@ from arrayqueue import ArrayQueue
 
 instance = ArrayQueue()
 
-class TestArrayStack(unittest.TestCase):
+class TestArrayQueue(unittest.TestCase):
     def test_setup(self):
-        self.add_item()
-        self.remove_item()
+        self.add_items()
+        self.remove_items()
 
-    def add_item(self):
+    def add_items(self):
         print(f">> 1. {instance.a}")
         instance.add('a')
         instance.add('b')
@@ -19,7 +19,7 @@ class TestArrayStack(unittest.TestCase):
         print(f">> 2. {instance.a} Added")
         self.assertEqual(''.join(instance.a), 'abcdef')
 
-    def remove_item(self):
+    def remove_items(self):
         instance.remove()
         print(f">> 3. {instance.a} Removed")
         instance.remove()
