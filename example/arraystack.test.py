@@ -11,17 +11,19 @@ class TestArrayStack(unittest.TestCase):
         self.set_item()
 
     def add_item(self):
-        print(f">> 1. {instance.a}")
         instance.add(0, 0)
+        print(f">> 1. {instance.a}")
+        instance.add(0, 1)
         print(f">> 2. {instance.a}")
-        self.assertEqual(instance.get(0), 0)
+        self.assertEqual(instance.get(0), 1)
+        self.assertEqual(instance.get(1), 0)
 
     def remove_item(self):
         instance.add(1, 1)
         print(f">> 3. {instance.a}")
         temp = instance.remove(0)
         print(f">> 4. {instance.a}")
-        self.assertEqual(temp, 0)
+        self.assertEqual(temp, 1)
 
     def get_item(self):
         instance.add(1, 1)
