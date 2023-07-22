@@ -1,5 +1,5 @@
-def new_array(n = 0, h = None):
-    return [None for _ in range(n)]
+def new_array(n = 0, h = ''):
+    return ['' for _ in range(n)]
 
 class ArrayStack:
     def __init__(self, iterate=[]):
@@ -23,19 +23,23 @@ class ArrayStack:
         if len(self.a) == self.n:
             self._resize()
 
-        self.a[i + 1:self.n] = self.a[i:self.n - 1]
+        self.a[i + 1:self.n + 1] = self.a[i:self.n]
         self.a[i] = x
         self.n += 1
 
     def remove(self, i):
         temp = self.a[i]
         self.a[i:self.n - 1] = self.a[i + 1:self.n] 
+        self.a[self.n - 1] = ''
         self.n -= 1
 
         if len(self.a) > 3 * self.n:
             self._resize()
 
         return temp
+
+    def size(self):
+        return self.n
 
     def _resize(self):
         b = new_array(max(1, 2 * self.n))
