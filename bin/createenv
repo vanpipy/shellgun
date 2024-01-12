@@ -17,6 +17,26 @@ function install() {
         echo ">> Proxy setting: git config --global http.https://github.com http://$localURI"
         git config --global http.https://github.com.proxy http://$localURI
     fi
+    echo ">> Done"
+
+    echo ">> Git global setting"
+    git config --global alias.st status
+    git config --global alias.cmt commit
+    git config --global alias.ck checkout
+    echo ">> Typing your name used with git globally"
+    read -p ">> Username: " username
+    if [[ -z "$username" ]]; then
+        echo ">> Ignore git username setting"
+    else
+        git config --global user.name "$username"
+    fi
+    read -p ">> User email: " email
+    if [[ -z "$email" ]]; then
+        echo ">> Ignore git user email setting"
+    else
+        git config --global user.email "$email"
+    fi
+    echo ">> Done"
 
     echo ">> Install ohmytmux"
     git clone https://github.com/gpakosz/.tmux.git ~/.tmux
