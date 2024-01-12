@@ -50,7 +50,6 @@ function install() {
     git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
     cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
     chsh -s /bin/zsh
-    zsh
     echo ">> Done"
 
     echo ">> Install node version manager and node@20.10.0"
