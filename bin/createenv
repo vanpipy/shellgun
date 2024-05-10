@@ -71,7 +71,7 @@ function install() {
     curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/f1ef76e6788929f5fe80294b55306bdada48dfe2/vimrc
     echo ">> You would better to install the plugins by yourself"
     echo ">> 1. :PlugInstall"
-    echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-jedi"
+    echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
     echo ">> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
     echo ">> Done"
 
