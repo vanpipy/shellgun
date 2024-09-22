@@ -7,6 +7,9 @@ function install() {
     echo ">> Install pre-dependencies"
 
     echo ">> $runner install git tmux tree cmake gcc zsh"
+    # see https://monsec.io/posts/resources/kali/mirrors/
+    sudo sed -i 's$http://http.kali.org/kali$https://mirrors.ocf.berkeley.edu/kali/$' /etc/apt/sources.list
+    sudo $runner update
     sudo $runner install git tmux tree cmake gcc zsh
 
     echo ">> Avoid the github cannot be accessed, set a git proxy for accessing github"
@@ -56,15 +59,6 @@ function install() {
     git clone https://github.com/tj/n.git ~/Project/n
     cd ~/Project/n
     sudo make
-    cd -
-    source ~/.zshrc
-    sudo n 20.10.0
-    echo "The install maybe failed with the blocked network, try to switch the mirror export N_NODE_MIRROR=https://npmmirror.com/mirrors/node"
-    echo "And the N_NODE_MIRROR maybe did not work cause the sudoer rule"
-    echo "Add the Defaults env_keep += \"N_NODE_MIRROR\" to make it work as wish"
-    echo "And the install will be failed again cause the sudo n cannot be found cause the sudo PATH did not include the installed path /usr/local/bin"
-    echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
-    echo ">> Done"
 
     echo ">> Install vimrc"
     curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
@@ -73,6 +67,17 @@ function install() {
     echo ">> 1. :PlugInstall"
     echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
     echo ">> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
+    echo ">> Done"
+
+    zsh
+    cd -
+    source ~/.zshrc
+    sudo n 20.10.0
+    echo "The install maybe failed with the blocked network, try to switch the mirror export N_NODE_MIRROR=https://registry.npmmirror.com/-/binary/node"
+    echo "And the N_NODE_MIRROR maybe did not work cause the sudoer rule"
+    echo "Add the Defaults env_keep += \"N_NODE_MIRROR\" to make it work as wish"
+    echo "And the install will be failed again cause the sudo n cannot be found cause the sudo PATH did not include the installed path /usr/local/bin"
+    echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
     echo ">> Done"
 
     exit 0
