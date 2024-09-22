@@ -26,6 +26,8 @@ function install() {
     git config --global alias.st status
     git config --global alias.cmt commit
     git config --global alias.ck checkout
+    git config --global credential.helper store
+
     echo ">> Typing your name used with git globally"
     read -p ">> Username: " username
     if [[ -z "$username" ]]; then
