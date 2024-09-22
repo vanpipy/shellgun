@@ -82,6 +82,17 @@ function install() {
     echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
     echo ">> Done"
 
+    echo ">> Install neovim"
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz -o ~/Download/nvim-linux64.tar.gz
+    cd ~/Download
+    tar zxvf nvim-linux64.tar.gz
+    sudo mv nvim-linux64 /opt/nvim
+    sudo rm /usr/bin/vi
+    sudo ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim
+    sudo ln -s /opt/nvim/bin/nvim /usr/bin/vi
+    git clone https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
+    echo ">> Done"
+
     exit 0
 }
 
