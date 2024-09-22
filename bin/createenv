@@ -1,99 +1,102 @@
 #!/usr/bin/env bash
 
 function install() {
-    runner="apt"
+  runner="apt"
 
-    echo ">> Use $runner to install dependency"
-    echo ">> Install pre-dependencies"
+  echo ">> Use $runner to install dependency"
+  echo ">> Install pre-dependencies"
 
-    echo ">> $runner install git tmux tree cmake gcc zsh"
-    # see https://monsec.io/posts/resources/kali/mirrors/
-    sudo sed -i 's$http://http.kali.org/kali$https://mirrors.ocf.berkeley.edu/kali/$' /etc/apt/sources.list
-    sudo $runner update
-    sudo $runner install git tmux tree cmake gcc zsh
+  echo ">> $runner install git tmux tree cmake gcc zsh"
+  # see https://monsec.io/posts/resources/kali/mirrors/
+  sudo sed -i 's$http://http.kali.org/kali$https://mirrors.ocf.berkeley.edu/kali/$' /etc/apt/sources.list
+  sudo $runner update
+  sudo $runner install git tmux tree cmake gcc zsh
 
-    echo ">> Avoid the github cannot be accessed, set a git proxy for accessing github"
-    read -p ">> Please typing: " localURI
-    if [[ -z "$localURI" ]]; then
-        echo ">> Ignore the git proxy setting"
-    else
-        echo ">> Proxy setting: git config --global http.https://github.com http://$localURI"
-        git config --global http.https://github.com.proxy http://$localURI
-    fi
-    echo ">> Done"
+  echo ">> Avoid the github cannot be accessed, set a git proxy for accessing github"
+  read -p ">> Please typing: " localURI
+  if [[ -z "$localURI" ]]; then
+    echo ">> Ignore the git proxy setting"
+  else
+    echo ">> Proxy setting: git config --global http.https://github.com http://$localURI"
+    git config --global http.https://github.com.proxy http://$localURI
+  fi
+  echo ">> Done"
 
-    echo ">> Git global setting"
-    git config --global alias.st status
-    git config --global alias.cmt commit
-    git config --global alias.ck checkout
-    git config --global credential.helper store
+  echo ">> Git global setting"
+  git config --global alias.st status
+  git config --global alias.cmt commit
+  git config --global alias.ck checkout
+  git config --global credential.helper store
 
-    echo ">> Typing your name used with git globally"
-    read -p ">> Username: " username
-    if [[ -z "$username" ]]; then
-        echo ">> Ignore git username setting"
-    else
-        git config --global user.name "$username"
-    fi
-    read -p ">> User email: " email
-    if [[ -z "$email" ]]; then
-        echo ">> Ignore git user email setting"
-    else
-        git config --global user.email "$email"
-    fi
-    echo ">> Done"
+  echo ">> Typing your name used with git globally"
+  read -p ">> Username: " username
+  if [[ -z "$username" ]]; then
+    echo ">> Ignore git username setting"
+  else
+    git config --global user.name "$username"
+  fi
+  read -p ">> User email: " email
+  if [[ -z "$email" ]]; then
+    echo ">> Ignore git user email setting"
+  else
+    git config --global user.email "$email"
+  fi
+  echo ">> Done"
 
-    echo ">> Install ohmytmux"
-    git clone https://github.com/gpakosz/.tmux.git ~/.tmux
-    ln -s -f .tmux/.tmux.conf ~/.tmux.conf
-    echo
-    echo ">> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
-    echo ">> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
-    echo ">> Done"
+  echo ">> Install ohmytmux"
+  git clone https://github.com/gpakosz/.tmux.git ~/.tmux
+  ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+  echo
+  echo ">> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
+  echo ">> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
+  echo ">> Done"
 
-    echo ">> Install ohmyzsh"
-    git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
-    cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-    chsh -s /bin/zsh
-    echo ">> Done"
+  echo ">> Install ohmyzsh and plugins"
+  git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+  cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+  chsh -s /bin/zsh
+  zsh
+  git clone --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git $ZSH/plugins/zsh-autocomplete
+  sed -i 's/plugins=(/plugins=(zsh-autocomplete /' ~/.zshrc
+  echo ">> Done"
 
-    echo ">> Install node version manager and node@20.10.0"
-    git clone https://github.com/tj/n.git ~/Project/n
-    cd ~/Project/n
-    sudo make
+  echo ">> Install node version manager and node@20.10.0"
+  curl https://get.volta.sh | bash
+  echo 'VOLTA_HOME=$HOME/.volta\nexport PATH="$PATH:$VOLTA_HOME/bin"' >>~/.zshrc
+  volta install node@20.10.0
+  source ~/.zshrc
+  echo "The install maybe failed with the blocked network, try to switch the mirror export N_NODE_MIRROR=https://registry.npmmirror.com/-/binary/node"
+  echo "And the N_NODE_MIRROR maybe did not work cause the sudoer rule"
+  echo "Add the Defaults env_keep += \"N_NODE_MIRROR\" to make it work as wish"
+  echo "And the install will be failed again cause the sudo n cannot be found cause the sudo PATH did not include the installed path /usr/local/bin"
+  echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
+  echo ">> Done"
 
-    echo ">> Install vimrc"
-    curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
-    curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/f1ef76e6788929f5fe80294b55306bdada48dfe2/vimrc
-    echo ">> You would better to install the plugins by yourself"
-    echo ">> 1. :PlugInstall"
-    echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
-    echo ">> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
-    echo ">> Done"
+  echo ">> Install vimrc"
+  curl -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
+  curl -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/f1ef76e6788929f5fe80294b55306bdada48dfe2/vimrc
+  echo ">> You would better to install the plugins by yourself"
+  echo ">> 1. :PlugInstall"
+  echo ">> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
+  echo ">> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
+  echo ">> Done"
 
-    zsh
-    cd -
-    source ~/.zshrc
-    sudo n 20.10.0
-    echo "The install maybe failed with the blocked network, try to switch the mirror export N_NODE_MIRROR=https://registry.npmmirror.com/-/binary/node"
-    echo "And the N_NODE_MIRROR maybe did not work cause the sudoer rule"
-    echo "Add the Defaults env_keep += \"N_NODE_MIRROR\" to make it work as wish"
-    echo "And the install will be failed again cause the sudo n cannot be found cause the sudo PATH did not include the installed path /usr/local/bin"
-    echo "Add the /usr/local/bin into the PATH in the /etc/sudoers via visudo"
-    echo ">> Done"
+  echo ">> Install neovim"
+  curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz -o ~/Download/nvim-linux64.tar.gz
+  cd ~/Download
+  tar zxvf nvim-linux64.tar.gz
+  sudo mv nvim-linux64 /opt/nvim
+  sudo rm /usr/bin/vi
+  sudo ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim
+  sudo ln -s /opt/nvim/bin/nvim /usr/bin/vi
+  git clone https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
+  echo ">> Done"
 
-    echo ">> Install neovim"
-    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz -o ~/Download/nvim-linux64.tar.gz
-    cd ~/Download
-    tar zxvf nvim-linux64.tar.gz
-    sudo mv nvim-linux64 /opt/nvim
-    sudo rm /usr/bin/vi
-    sudo ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim
-    sudo ln -s /opt/nvim/bin/nvim /usr/bin/vi
-    git clone https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
-    echo ">> Done"
+  echo ">> Update default editor as /usr/bin/vim.basic"
+  sudo update-alternatives --set editor /usr/bin/vim.basic
+  echo ">> Once failed try \"sudo update-alternatives --config editor\""
 
-    exit 0
+  exit 0
 }
 
 install
