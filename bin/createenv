@@ -58,6 +58,7 @@ function install() {
   zsh
   git clone --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git $ZSH/plugins/zsh-autocomplete
   sed -i 's/plugins=(/plugins=(zsh-autocomplete /' ~/.zshrc
+  sed -i 's/ZSH_THEME=".\+"/ZSH_THEME="bira"/' ~/.zshrc
   echo ">> Done"
 
   echo ">> Install node version manager and node@20.10.0"
