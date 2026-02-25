@@ -413,7 +413,7 @@ detect_os
 
 log_step "Prepare for SSH port change"
 if command -v firewall-cmd >/dev/null 2>&1; then
-    if systemctl is-active firewalld >/devnull 2>&1; then
+    if systemctl is-active firewalld >/dev/null 2>&1; then
         firewall-cmd --add-port="$SSH_PORT/tcp" || true
     fi
 elif command -v ufw >/dev/null 2>&1; then
@@ -429,8 +429,6 @@ if command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce)" == "Enforcing" ]]
     fi
 fi
 
-log_step "Check SSH key setup"
-
 if ! id "$USERNAME" &>/dev/null; then
     log_error "User $USERNAME does not exist. Please run Phase 1 first."
     exit 1
@@ -439,22 +437,35 @@ fi
 USER_HOME=$(eval echo ~$USERNAME)
 AUTH_KEYS="$USER_HOME/.ssh/authorized_keys"
 
-if [[ ! -f "$AUTH_KEYS" ]]; then
-    log_error "Authorized key file for $USERNAME not found."
-    cat << EOF
-${YELLOW}Run on your local machine first:${NC}
-ssh-copy-id -i ~/.ssh/id_ed25519.pub $USERNAME@<server_ip>
+log_step "Ensure SSH directory exists"
+if [[ ! -d "$USER_HOME/.ssh" ]]; then
+    mkdir -p "$USER_HOME/.ssh"
+    chown "$USERNAME":"$USERNAME" "$USER_HOME/.ssh"
+    chmod 700 "$USER_HOME/.ssh"
+fi
 
-If you do not have an SSH key pair yet, generate one:
-ssh-keygen -t ed25519 -C "your_email@example.com"
-EOF
-    exit 1
+log_step "Check SSH key setup"
+HAS_KEYS=1
+if [[ ! -f "$AUTH_KEYS" ]]; then
+    HAS_KEYS=0
 fi
 
 log_step "Fix SSH directory permissions"
 chmod 700 "$USER_HOME/.ssh"
-chmod 600 "$AUTH_KEYS"
+if [[ -f "$AUTH_KEYS" ]]; then chmod 600 "$AUTH_KEYS"; fi
 log_info "Permissions fixed"
+
+if [[ "$HAS_KEYS" -eq 0 ]]; then
+    log_warn "authorized_keys not found for $USERNAME; skipping SSH hardening to avoid lockout."
+    cat << EOF
+${YELLOW}Next step (on your local machine):${NC}
+ssh-copy-id -i ~/.ssh/id_ed25519.pub $USERNAME@<server_ip>
+
+Then re-run the SSH phase:
+sudo security-configure.sh ssh --ssh-port $SSH_PORT --username $USERNAME
+EOF
+    return 0
+fi
 
 log_step "Backup SSH configuration"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d%H%M%S)
