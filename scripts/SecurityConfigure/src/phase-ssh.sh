@@ -76,8 +76,6 @@ log_step "Test SSH key login"
 log_info "In another terminal, test: ssh -p $SSH_PORT $USERNAME@<server_ip>"
 if [[ "${NON_INTERACTIVE:-0}" -ne 1 && "${YES:-0}" -ne 1 ]]; then
     read -p "Confirm passwordless login works? (y/n): " -n 1 -r
-if [[ "${NON_INTERACTIVE:-0}" -ne 1 && "${YES:-0}" -ne 1 ]]; then
-    read -p "Confirm passwordless login works? (y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         log_error "Make sure key-based login works before proceeding."
