@@ -453,8 +453,9 @@ fi
 log_step "Fix SSH directory permissions"
 chmod 700 "$USER_HOME/.ssh"
 if [[ -f "$AUTH_KEYS" ]]; then chmod 600 "$AUTH_KEYS"; fi
-log_info "Permissions fixed"
-
+log_step "Backup SSH configuration"
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d%H%M%S)
+# If no authorized_keys, do not proceed to harden sshd to avoid lockout.
 if [[ "$HAS_KEYS" -eq 0 ]]; then
     log_warn "authorized_keys not found for $USERNAME; skipping SSH hardening to avoid lockout."
     cat << EOF
@@ -467,12 +468,12 @@ EOF
     return 0
 fi
 
-log_step "Backup SSH configuration"
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d%H%M%S)
 log_info "Configuration backed up"
 
 log_step "Test SSH key login"
 log_info "In another terminal, test: ssh -p $SSH_PORT $USERNAME@<server_ip>"
+if [[ "${NON_INTERACTIVE:-0}" -ne 1 && "${YES:-0}" -ne 1 ]]; then
+    read -p "Confirm passwordless login works? (y/n): " -n 1 -r
 if [[ "${NON_INTERACTIVE:-0}" -ne 1 && "${YES:-0}" -ne 1 ]]; then
     read -p "Confirm passwordless login works? (y/n): " -n 1 -r
     echo
