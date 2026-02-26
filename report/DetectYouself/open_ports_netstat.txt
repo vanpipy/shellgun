@@ -1,0 +1,12 @@
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:18789         0.0.0.0:*               LISTEN      39886/openclaw-gate 
+tcp        0      0 127.0.0.1:18792         0.0.0.0:*               LISTEN      39886/openclaw-gate 
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      -                   
+tcp6       0      0 :::22                   :::*                    LISTEN      -                   
+tcp6       0      0 ::1:18789               :::*                    LISTEN      39886/openclaw-gate 
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           39886/openclaw-gate 
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           39886/openclaw-gate 
+udp        0      0 127.0.0.1:323           0.0.0.0:*                           -                   
+udp6       0      0 ::1:323                 :::*                                -                   

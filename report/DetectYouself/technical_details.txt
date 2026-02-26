@@ -1,0 +1,59 @@
+=== Technical Data Collection ===
+
+1. System Uptime:
+ 18:02:55 up 18:11,  0 users,  load average: 0.08, 0.07, 0.02
+
+2. Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+devtmpfs        916M     0  916M   0% /dev
+tmpfs           936M     0  936M   0% /dev/shm
+tmpfs           936M  548K  935M   1% /run
+tmpfs           936M     0  936M   0% /sys/fs/cgroup
+/dev/vda3        40G   12G   26G  33% /
+/dev/vda2       200M  5.8M  194M   3% /boot/efi
+tmpfs           188M     0  188M   0% /run/user/1000
+
+3. Memory Usage:
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.0Gi       437Mi       2.0Mi       611Mi       863Mi
+Swap:            0B          0B          0B
+
+4. Running Processes (Top 10 by CPU):
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        2377  1.0  1.4 160076 27152 ?        Ssl  Feb25  11:27 /usr/local/aegis/aegis_client/aegis_12_81/AliYunDunMonitor
+root         994  0.4  0.4 100076  7840 ?        Ssl  Feb25   5:04 /usr/local/aegis/aegis_client/aegis_12_81/AliYunDun
+admin      39886  0.4 25.7 10484716 493064 ?     Ssl  10:17   2:15 openclaw-gateway
+root         647  0.2  0.7 475056 13976 ?        Ssl  Feb25   2:15 /usr/libexec/platform-python -Es /usr/sbin/tuned -l -P
+root         933  0.1  0.4 689624  9432 ?        Ssl  Feb25   1:25 /usr/local/share/aliyun-assist/2.2.4.1007/aliyun-service
+root           1  0.0  0.2 103656  5232 ?        Ss   Feb25   0:03 /usr/lib/systemd/systemd --switched-root --system --deserialize 17
+root           2  0.0  0.0      0     0 ?        S    Feb25   0:00 [kthreadd]
+root           3  0.0  0.0      0     0 ?        I<   Feb25   0:00 [rcu_gp]
+root           4  0.0  0.0      0     0 ?        I<   Feb25   0:00 [rcu_par_gp]
+root           6  0.0  0.0      0     0 ?        I<   Feb25   0:00 [kworker/0:0H-kblockd]
+
+5. Docker Status:
+
+6. Network Connections:
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:18789         0.0.0.0:*               LISTEN      39886/openclaw-gate 
+tcp        0      0 127.0.0.1:18792         0.0.0.0:*               LISTEN      39886/openclaw-gate 
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      -                   
+tcp6       0      0 :::22                   :::*                    LISTEN      -                   
+tcp6       0      0 ::1:18789               :::*                    LISTEN      39886/openclaw-gate 
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           39886/openclaw-gate 
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           39886/openclaw-gate 
+udp        0      0 127.0.0.1:323           0.0.0.0:*                           -                   
+udp6       0      0 ::1:323                 :::*                                -                   
+
+7. User Information:
+Current user: admin
+Home directory: /home/admin
+Shell: /bin/bash
+
+8. Critical File Permissions:
+-rw-r--r--  1 root root 1274 Feb 10 15:52 /etc/passwd
+----------  1 root root  674 Feb 11 15:06 /etc/shadow
+-r--r-----. 1 root root 4388 Feb 25 23:52 /etc/sudoers
+

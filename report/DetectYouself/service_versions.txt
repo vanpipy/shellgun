@@ -1,0 +1,1 @@
+./report/DetectYouself/reconnaissance_script.sh: line 47: sshd: command not found
