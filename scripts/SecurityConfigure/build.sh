@@ -5,7 +5,7 @@ IFS=$'\n\t'
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$ROOT_DIR/src"
 PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
-OUT_FILE="$PROJECT_ROOT/lib/security-configure.sh"
+OUT_FILE="$PROJECT_ROOT/lib/security-configure"
 OUT_STANDALONE="$PROJECT_ROOT/lib/security-configure"
 COMMON_SRC="$SRC_DIR/common.sh"
 
