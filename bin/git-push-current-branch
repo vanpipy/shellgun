@@ -6,7 +6,7 @@
 set -euo pipefail
 
 main() {
-    local branch options
+    local branch options remote
 
     branch=$(git branch --show-current 2>/dev/null) ||
         branch=$(git branch | grep '^\*' | awk '{print $2}')
@@ -16,14 +16,37 @@ main() {
         exit 1
     fi
 
-    options=()
+    # Check if any remotes exist
+    if ! git remote | grep -q .; then
+        echo "No any remote" >&2
+        echo "Please add a remote first, e.g.:" >&2
+        echo "  git remote add origin https://github.com/your/repo.git" >&2
+        exit 1
+    fi
+
+    # Default to origin, but let user override via -r/--remote
+    remote="origin"
     while [[ $# -gt 0 ]]; do
-        options+=("$1")
-        shift
+        case "$1" in
+            -r|--remote)
+                remote="$2"; shift 2 ;;
+            -u|--set-upstream)
+                options+=("$1" "$2"); shift 2 ;;
+            -*)
+                options+=("$1"); shift ;;
+            *)
+                shift ;;
+        esac
     done
 
-    echo "Pushing '$branch' to origin"
-    git push "${options[@]}" -u origin "$branch"
+    if ! git remote | grep -q "^${remote}$"; then
+        echo "Error: remote '$remote' not found. Available remotes:" >&2
+        git remote | while read r; do echo "  - $r" >&2; done
+        exit 1
+    fi
+
+    echo "Pushing '$branch' to '$remote'"
+    git push "${options[@]}" -u "$remote" "$branch"
 }
 
 main "$@"
