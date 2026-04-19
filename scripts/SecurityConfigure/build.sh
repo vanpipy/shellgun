@@ -9,6 +9,10 @@ OUT_FILE="$PROJECT_ROOT/lib/security-configure"
 OUT_STANDALONE="$PROJECT_ROOT/lib/security-configure"
 COMMON_SRC="$SRC_DIR/common.sh"
 
+# Completion file paths
+BASH_COMP="$PROJECT_ROOT/lib/security-configure.bash"
+ZSH_COMP="$PROJECT_ROOT/lib/_security-configure"
+
 if [[ ! -f "$COMMON_SRC" ]]; then
   echo "common.sh not found at $COMMON_SRC" >&2
   exit 1
@@ -41,6 +45,41 @@ with open('$OUT_STANDALONE', 'w') as f:
     f.write(content)
 "
 chmod +x "$OUT_STANDALONE"
+
+echo "[BUILD] Generating bash completion: $BASH_COMP"
+cat > "$BASH_COMP" << 'EOF'
+# bash completion for security-configure
+_security-configure() {
+    local cur prev
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "user ssh firewall cleanup all help" -- "$cur"))
+        return
+    fi
+
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "--ssh-port --username --non-interactive --yes --help" -- "$cur"))
+    fi
+}
+complete -F _security-configure security-configure
+EOF
+
+echo "[BUILD] Generating zsh completion: $ZSH_COMP"
+cat > "$ZSH_COMP" << 'EOF'
+#compdef security-configure
+_security-configure() {
+    local -a cmds=(user ssh firewall cleanup all)
+    _describe 'subcommand' cmds
+    _arguments \
+        '--ssh-port[SSH port]:port:' \
+        '--username[username]:name:' \
+        '--non-interactive[non-interactive mode]' \
+        '-y[assume yes]' \
+        '--help[show help]'
+}
+_security-configure "$@"
+EOF
 
 echo "[BUILD] Generating single-file dispatcher: $OUT_FILE"
 
