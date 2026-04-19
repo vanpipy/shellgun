@@ -4,19 +4,19 @@ BINPREFIX ?= "$(PREFIX)/bin"
 SECURITY_CONF_DIR := scripts/SecurityConfigure
 BUILD_SCRIPT := $(SECURITY_CONF_DIR)/build.sh
 SRC_FILES := $(wildcard $(SECURITY_CONF_DIR)/src/*.sh)
-OUT_FILE := bin/security-configure.sh
+OUT_FILE := lib/security-configure.sh
 
 default: install
 
 .PHONY: security-configure
 security-configure: $(OUT_FILE)
 
-$(OUT_FILE): $(SRC_FILES) $(BUILD_SCRIPT) | bin
+$(OUT_FILE): $(SRC_FILES) $(BUILD_SCRIPT) | lib
 	@echo "[MAKE] Building security-configure"
 	bash $(BUILD_SCRIPT)
 
-bin:
-	@mkdir -p bin
+lib:
+	@mkdir -p lib
 
 install: security-configure
 	@echo "Install bins to $(BINPREFIX)"
@@ -38,4 +38,4 @@ clean: clean-security-configure
 .PHONY: clean-security-configure
 clean-security-configure:
 	@rm -f $(OUT_FILE)
-	@rm -rf bin/SecurityConfigure
+	@rm -rf lib/SecurityConfigure

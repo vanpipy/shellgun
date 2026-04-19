@@ -5,7 +5,7 @@ IFS=$'\n\t'
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$ROOT_DIR/src"
 PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
-OUT_FILE="$PROJECT_ROOT/bin/security-configure.sh"
+OUT_FILE="$PROJECT_ROOT/lib/security-configure.sh"
 COMMON_SRC="$SRC_DIR/common.sh"
 
 if [[ ! -f "$COMMON_SRC" ]]; then
@@ -13,14 +13,14 @@ if [[ ! -f "$COMMON_SRC" ]]; then
   exit 1
 fi
 
-mkdir -p "$PROJECT_ROOT/bin"
+mkdir -p "$PROJECT_ROOT/lib"
 
 # Clean old multi-file outputs if any (non-backward compatible single file output)
-rm -f "$PROJECT_ROOT/bin/phase-user.sh" \
-      "$PROJECT_ROOT/bin/phase-ssh.sh" \
-      "$PROJECT_ROOT/bin/phase-firewall.sh" \
-      "$PROJECT_ROOT/bin/phase-cleanup.sh"
-rm -rf "$PROJECT_ROOT/bin/SecurityConfigure" || true
+rm -f "$PROJECT_ROOT/lib/phase-user.sh" \
+      "$PROJECT_ROOT/lib/phase-ssh.sh" \
+      "$PROJECT_ROOT/lib/phase-firewall.sh" \
+      "$PROJECT_ROOT/lib/phase-cleanup.sh"
+rm -rf "$PROJECT_ROOT/lib/SecurityConfigure" || true
 
 echo "[BUILD] Generating single-file dispatcher: $OUT_FILE"
 
