@@ -1,17 +1,110 @@
 #!/bin/bash
-set -euo pipefail
-IFS=$'\n\t'
+#
+# Common utilities for security configuration scripts
+#
 
 # Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Logging helpers
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
+log_step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
+
+# Check root privileges
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        log_error "Requires root privileges. Run with sudo."
+        exit 1
+    fi
+}
+
+# Parse CLI arguments
+# Sets SSH_PORT, USERNAME, NON_INTERACTIVE, YES globals
+parse_args() {
+    SSH_PORT=${SSH_PORT:-22222}
+    USERNAME=${USERNAME:-app}
+    NON_INTERACTIVE=${NON_INTERACTIVE:-0}
+    YES=${YES:-0}
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --ssh-port)
+                SSH_PORT="$2"; shift 2 ;;
+            --username)
+                USERNAME="$2"; shift 2 ;;
+            --non-interactive)
+                NON_INTERACTIVE=1; shift ;;
+            -y|--yes)
+                YES=1; shift ;;
+            --help)
+                show_help; exit 0 ;;
+            *)
+                log_error "Unknown argument: $1"
+                show_help; exit 1 ;;
+        esac
+    done
+
+    if [[ ! $SSH_PORT =~ ^[0-9]+$ ]] || [[ $SSH_PORT -lt 1 ]] || [[ $SSH_PORT -gt 65535 ]]; then
+        log_error "SSH port must be 1-65535"
+        exit 1
+    fi
+
+    if [[ ! $USERNAME =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        log_error "Username must start with letter/underscore, contain only lowercase, digits, underscore, hyphen"
+        exit 1
+    fi
+}
+
+# Detect OS - sets OS, VER, FAMILY globals
+detect_os() {
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        OS=$ID
+        VER=$VERSION_ID
+    else
+        log_error "Cannot detect operating system"
+        exit 1
+    fi
+
+    log_info "Detected OS: $OS $VER"
+    FAMILY="other"
+    case "$OS" in
+        centos|rhel|alinux|rocky|almalinux) FAMILY="rhel" ;;
+        ubuntu|debian) FAMILY="debian" ;;
+    esac
+}
+
+# Install packages by family
+install_packages() {
+    local packages=("$@")
+
+    if [[ -z "${FAMILY:-}" ]]; then
+        detect_os
+    fi
+
+    case "$FAMILY" in
+        rhel)
+            (command -v dnf >/dev/null 2>&1 && dnf install -y "${packages[@]}") ||
+                yum install -y "${packages[@]}"
+            ;;
+        debian)
+            if ! command -v apt >/dev/null 2>&1; then
+                log_error "apt not found"
+                exit 1
+            fi
+            export DEBIAN_FRONTEND=noninteractive
+            apt update && apt install -y "${packages[@]}"
+            ;;
+        *)
+            log_error "Unsupported OS: $OS"
+            exit 1 ;;
+    esac
 }
 
 log_warn() {

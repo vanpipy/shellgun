@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# Security configuration orchestrator
+# Usage: security-configure [subcommand] [options]
+#   subcommand: user | ssh | firewall | cleanup | all (default)
+#
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF_DIR="$SCRIPT_DIR/scripts/SecurityConfigure"
+
+# shellcheck source=common.sh
+source "$CONF_DIR/src/common.sh"
+
+show_help() {
+    cat << EOF
+Usage: security-configure [subcommand] [options]
+
+Subcommands:
+  user      Run Phase 1 (user setup)
+  ssh       Run Phase 2 (SSH hardening)
+  firewall  Run Phase 3 (firewall & fail2ban)
+  cleanup   Run Phase 4 (post checks & cleanup)
+  all       Run all phases in order (default)
+
+Options:
+  --ssh-port PORT      SSH port (default: 22222)
+  --username NAME      User to manage (default: app)
+  --non-interactive    Non-interactive mode
+  -y, --yes            Assume yes for prompts
+  --help               Show this help
+EOF
+}
+
+main() {
+    local cmd="all"
+    if [[ $# -gt 0 && "$1" != --* ]]; then
+        cmd="$1"; shift
+    fi
+
+    if [[ "$cmd" == "help" || "$cmd" == "--help" || "$cmd" == "-h" ]]; then
+        show_help; exit 0
+    fi
+
+    parse_args "$@"
+    check_root
+    detect_os
+
+    case "$cmd" in
+        user)      source "$CONF_DIR/src/phase-user.sh";      phase_user ;;
+        ssh)       source "$CONF_DIR/src/phase-ssh.sh";       phase_ssh ;;
+        firewall)  source "$CONF_DIR/src/phase-firewall.sh";  phase_firewall ;;
+        cleanup)   source "$CONF_DIR/src/phase-cleanup.sh";   phase_cleanup ;;
+        all)
+            source "$CONF_DIR/src/phase-user.sh"
+            source "$CONF_DIR/src/phase-ssh.sh"
+            source "$CONF_DIR/src/phase-firewall.sh"
+            source "$CONF_DIR/src/phase-cleanup.sh"
+            phase_user; phase_ssh; phase_firewall; phase_cleanup ;;
+        *) echo "Unknown subcommand: $cmd"; show_help; exit 1 ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
