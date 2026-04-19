@@ -1,34 +1,51 @@
 # Shellgun
 
-Opinionated server security hardening toolkit for Linux cloud servers.
+> Shot every shelled problem with shelled bullet.
 
-## Quick Start
+## Build
 
 ```bash
-# Build
 make security-configure
+```
 
-# Install
+## Install
+
+```bash
 sudo make install
 ```
+
+This installs:
+- `bin/*` binaries to `/usr/local/bin/`
+- `security-configure` to `/usr/local/bin/`
+- Bash completion to `/usr/local/share/bash-completion/completions/`
+- Zsh completion to `/usr/local/share/zsh/site-functions/`
+
+## Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make security-configure` | Build `lib/security-configure` from source |
+| `make install` | Install all to `/usr/local/bin/` (default) |
+| `make uninstall` | Remove all installed files |
+| `make clean` | Remove `lib/` build directory |
 
 ## Usage
 
 ```bash
-# Show help
+# Show help (no root required)
 security-configure help
 
 # Run all phases (default)
 sudo security-configure all --ssh-port 22222 --username myapp
 
 # Run single phase
-sudo security-configure user --ssh-port 22222 --username myapp
-sudo security-configure ssh --ssh-port 22222 --username myapp
+sudo security-configure user    --ssh-port 22222 --username myapp
+sudo security-configure ssh     --ssh-port 22222 --username myapp
 sudo security-configure firewall --ssh-port 22222 --username myapp
 sudo security-configure cleanup --ssh-port 22222 --username myapp
 ```
 
-## Subcommands
+### Subcommands
 
 | Subcommand | Description |
 |------------|-------------|
@@ -38,7 +55,7 @@ sudo security-configure cleanup --ssh-port 22222 --username myapp
 | `cleanup` | Phase 4: post checks & cleanup |
 | `all` | Run all phases in sequence (default) |
 
-## Options
+### Options
 
 - `--ssh-port PORT` SSH port (default: 22222)
 - `--username NAME` Target user (default: app)
@@ -68,9 +85,9 @@ sudo make uninstall
 ## Project Structure
 
 ```
-bin/                     # Binaries (git-tracked)
+bin/                           # Binaries (git-tracked)
 scripts/SecurityConfigure/
-  src/                   # Phase source scripts
-  build.sh               # Build script
-lib/                     # Build output (temp, not tracked)
+  src/                         # Phase source scripts
+  build.sh                     # Build script
+lib/                           # Build output (temp, not tracked)
 ```
