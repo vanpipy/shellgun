@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$ROOT_DIR/src"
 PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 OUT_FILE="$PROJECT_ROOT/lib/security-configure.sh"
+OUT_STANDALONE="$PROJECT_ROOT/lib/security-configure"
 COMMON_SRC="$SRC_DIR/common.sh"
 
 if [[ ! -f "$COMMON_SRC" ]]; then
@@ -21,6 +22,25 @@ rm -f "$PROJECT_ROOT/lib/phase-user.sh" \
       "$PROJECT_ROOT/lib/phase-firewall.sh" \
       "$PROJECT_ROOT/lib/phase-cleanup.sh"
 rm -rf "$PROJECT_ROOT/lib/SecurityConfigure" || true
+
+echo "[BUILD] Generating dispatcher: $OUT_STANDALONE"
+python3 -c "
+import sys
+root = '$PROJECT_ROOT'
+with open('$PROJECT_ROOT/bin/security-configure') as f:
+    content = f.read()
+content = content.replace(
+    'SCRIPT_DIR=\"\$(cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd)\"',
+    'PROJECT_ROOT=\"' + root + '\"; SCRIPT_DIR=\"' + root + '/bin\"'
+)
+content = content.replace(
+    'CONF_DIR=\"\$SCRIPT_DIR/scripts/SecurityConfigure\"',
+    'CONF_DIR=\"' + root + '/scripts/SecurityConfigure\"'
+)
+with open('$OUT_STANDALONE', 'w') as f:
+    f.write(content)
+"
+chmod +x "$OUT_STANDALONE"
 
 echo "[BUILD] Generating single-file dispatcher: $OUT_FILE"
 

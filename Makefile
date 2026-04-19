@@ -21,13 +21,12 @@ lib:
 install: security-configure
 	@echo "Install bins to $(BINPREFIX)"
 	@ls ./bin | grep "^git" | xargs -I {} cp ./bin/{} $(BINPREFIX)/{}
-	@cp $(OUT_FILE) $(BINPREFIX)/security-configure.sh
-	@chmod +x $(BINPREFIX)/security-configure.sh
+	@cp ./lib/* $(BINPREFIX)/
 
 uninstall:
 	@echo "Uninstall..."
 	@ls ./bin | grep "^git" | xargs -I {} rm "$(BINPREFIX)/{}"
-	@rm -f "$(BINPREFIX)/security-configure.sh"
+	@rm -f "$(BINPREFIX)/security-configure" "$(BINPREFIX)/security-configure.sh"
 	@echo
 	@echo "Completed."
 
@@ -37,5 +36,5 @@ clean: clean-security-configure
 
 .PHONY: clean-security-configure
 clean-security-configure:
-	@rm -f $(OUT_FILE)
+	@rm -f ./lib/security-configure ./lib/security-configure.sh
 	@rm -rf lib/SecurityConfigure
