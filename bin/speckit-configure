@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# SpeckitConfigure - Multi-language SpecKit initializer
+# Usage: speckit-configure [OPTIONS] <project-dir>
+#
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF_DIR="$SCRIPT_DIR/scripts/SpeckitConfigure"
+
+# shellcheck source=common.sh
+source "$CONF_DIR/src/common.sh"
+
+phase_summary() {
+    local project_dir="$1"
+    local lang="$2"
+    local docs_lang="$3"
+    local ai_agent="$4"
+
+    echo ""
+    echo "=========================================="
+    print_success "Setup Complete!"
+    echo "=========================================="
+    echo "Project Directory: $project_dir"
+    echo "Programming Language: $lang"
+    echo "Documentation Language: $docs_lang"
+    echo "AI Agent: $ai_agent"
+    echo ""
+    echo "Next steps:"
+    echo "  cd $project_dir"
+    echo "  # Use your AI agent with SpecKit commands:"
+    echo "  /speckit.constitution  # Review the constitution"
+    echo "  /speckit.specify       # Start your first feature"
+    echo "  /speckit.plan          # Create implementation plan"
+    echo "  /speckit.tasks         # Break down into tasks"
+    echo "  /speckit.implement     # Execute implementation"
+    echo ""
+    echo "TDD is enabled: Always write tests first!"
+    echo "=========================================="
+}
+
+main() {
+    parse_args "$@"
+
+    echo ""
+    echo "=========================================="
+    echo "       SpecKit Initializer v1.0"
+    echo "  Multi-Language Support with TDD"
+    echo "=========================================="
+    echo ""
+
+    # Validate language
+    if ! validate_language "$PROGRAMMING_LANG"; then
+        print_error "Unsupported language: $PROGRAMMING_LANG"
+        echo "Supported languages: ${!LANG_CONFIG[*]}"
+        exit 1
+    fi
+
+    # Validate docs language
+    if [[ "$DOCS_LANG" != "en" ]] && [[ "$DOCS_LANG" != "zh" ]]; then
+        print_error "Documentation language must be 'en' or 'zh'"
+        exit 1
+    fi
+
+    # Validate AI agent (just warning, not error - Speckit will handle)
+    if ! validate_ai_agent "$AI_AGENT"; then
+        print_warning "AI agent '$AI_AGENT' may not be supported by SpecKit"
+        echo "Supported agents according to SpecKit: ${SUPPORTED_AI_AGENTS[*]}"
+        echo "Continuing anyway - Speckit will validate..."
+        echo ""
+    fi
+
+    # Create project directory if needed
+    if [[ "$PROJECT_DIR" != "." ]]; then
+        mkdir -p "$PROJECT_DIR"
+        print_info "Created directory: $PROJECT_DIR"
+    fi
+
+    # Source phase scripts
+    source "$CONF_DIR/src/phase-constitution.sh"
+    source "$CONF_DIR/src/phase-scaffold.sh"
+    source "$CONF_DIR/src/phase-config.sh"
+    source "$CONF_DIR/src/phase-init.sh"
+
+    # Run setup steps
+    check_prerequisites
+    phase_constitution "$PROJECT_DIR" "$PROGRAMMING_LANG" "$DOCS_LANG"
+    phase_scaffold "$PROJECT_DIR" "$PROGRAMMING_LANG"
+    phase_config "$PROJECT_DIR" "$PROGRAMMING_LANG" "$DOCS_LANG" "$AI_AGENT"
+    phase_init "$PROJECT_DIR" "$AI_AGENT" "$FORCE_MODE" "$IGNORE_AGENT_TOOLS"
+    phase_summary "$PROJECT_DIR" "$PROGRAMMING_LANG" "$DOCS_LANG" "$AI_AGENT"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
