@@ -8,6 +8,7 @@
 |---------|-------------|
 | `git-push-current-branch` | Push current branch to origin |
 | `security-configure` | Server security hardening orchestrator |
+| `speckit-configure` | Speckit configuration orchestrator |
 
 ## Install
 
@@ -17,7 +18,7 @@ sudo make install
 
 This installs:
 - `bin/*` binaries to `/usr/local/bin/`
-- `security-configure` to `/usr/local/bin/`
+- `security-configure` and `speckit-configure` to `/usr/local/bin/`
 - Bash completion to `/usr/local/share/bash-completion/completions/`
 - Zsh completion to `/usr/local/share/zsh/site-functions/`
 
