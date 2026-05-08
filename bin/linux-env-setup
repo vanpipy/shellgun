@@ -1,0 +1,221 @@
+#!/bin/bash
+#
+# =============================================================================
+# linux-env-configure - Linux Development Environment Setup Script
+# =============================================================================
+#
+# Description:
+#   Automated setup script for Linux development environment including git, tmux,
+#   zsh, neovim, volta (Node.js), and pyenv (Python). Supports both Ubuntu and
+#   Kali Linux distributions.
+#
+# Usage:
+#   ./linux-env-configure
+#
+# Requirements:
+#   - Ubuntu or Kali Linux
+#   - Root/sudo access for system package installation
+#   - Internet connection for cloning repositories
+#
+# =============================================================================
+#
+
+set -euo pipefail
+
+##------------------------------------------------------------------------------
+## Helper Functions
+##------------------------------------------------------------------------------
+
+# Check if running in WSL environment
+is_wsl() {
+  grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null
+}
+
+# Backup /etc/apt/sources.list
+backup_sources_list() {
+  local backup="/etc/apt/sources.list.backup-$(date +%Y%m%d%H%M%S%N)"
+  sudo cp /etc/apt/sources.list "$backup"
+}
+
+##------------------------------------------------------------------------------
+## Setup Functions
+##------------------------------------------------------------------------------
+
+# Setup system dependencies (package manager and base packages)
+setup_system_deps() {
+  if grep -qi kali /etc/os-release 2>/dev/null; then
+    echo "==> Detected Kali Linux"
+    backup_sources_list
+    sudo sed -i 's/^deb/# deb/g' /etc/apt/sources.list || { echo "Failed to modify sources.list"; exit 1; }
+    sudo sed -i '$a\deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' /etc/apt/sources.list || { echo "Failed to add sources.list entry"; exit 1; }
+    sudo apt update || { echo "Failed to update apt"; exit 1; }
+    sudo apt install -y git tmux tree cmake gcc zsh python3-pip || { echo "Failed to install dependencies"; exit 1; }
+  else
+    echo "==> Detected Ubuntu"
+    sudo apt update || { echo "Failed to update apt"; exit 1; }
+    sudo apt install -y git tmux tree cmake gcc zsh python3-pip || { echo "Failed to install dependencies"; exit 1; }
+  fi
+}
+
+# Setup git configuration and proxy
+setup_git_account() {
+  echo "==> Git global setting"
+  git config --global alias.st status
+  git config --global alias.cmt commit
+  git config --global alias.ck checkout
+  git config --global credential.helper store
+  echo "==> Done"
+}
+
+# Setup tmux with ohmytmux configuration
+setup_tmux() {
+  echo "==> Install ohmytmux"
+  if [[ -d ~/.tmux ]]; then
+    echo "==> ~/.tmux exists, removing..."
+    rm -rf ~/.tmux
+  fi
+  git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
+  ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+  echo
+
+  if is_wsl; then
+    echo "==> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
+    echo "==> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
+  fi
+  echo "==> Done"
+}
+
+# Setup zsh with ohmyzsh and plugins
+setup_zsh() {
+  echo "==> Install ohmyzsh and plugins"
+  if [[ -d ~/.oh-my-zsh ]]; then
+    echo "==> ~/.oh-my-zsh exists, removing..."
+    rm -rf ~/.oh-my-zsh
+  fi
+  git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+  cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+  chsh -s /bin/zsh
+
+  sed -i 's/ZSH_THEME=".\+"/ZSH_THEME="bira"/' ~/.zshrc
+
+  sed -i '$a\set -o vi' ~/.zshrc
+  echo "==> Done"
+}
+
+# Setup git-extras for additional git commands
+setup_git_extras() {
+  echo "==> Install git-extras"
+  mkdir -p ~/Project
+  if [[ -d ~/Project/git-extras ]]; then
+    echo "==> ~/Project/git-extras exists, removing..."
+    rm -rf ~/Project/git-extras
+  fi
+  git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras || { echo "Failed to clone git-extras"; exit 1; }
+  grep -q 'git-extras-completion' ~/.zshrc || sed -i '$a\source ~/Project/git-extras/etc/git-extras-completion.zsh' ~/.zshrc
+  echo "==> Done"
+}
+
+# Setup volta (Node.js version manager) and package managers
+setup_volta() {
+  echo "==> Install node version manager (Volta) and package managers"
+  if [[ -d ~/.volta ]]; then
+    echo "==> ~/.volta exists, removing..."
+    rm -rf ~/.volta
+  fi
+  curl https://get.volta.sh | bash
+  export VOLTA_HOME="$HOME/.volta"
+  [[ ":$PATH:" == *":$VOLTA_HOME/bin:"* ]] || export PATH="$VOLTA_HOME/bin:$PATH"
+
+  volta install node || { echo "Failed to install node"; exit 1; }
+  volta install pnpm || { echo "Failed to install pnpm"; exit 1; }
+  volta install bun || { echo "Failed to install bun"; exit 1; }
+  echo "==> Done"
+}
+
+# Setup vim and neovim configuration
+setup_vim() {
+  echo "==> Initialize vimrc"
+  mkdir -p ~/.vim/autoload
+  curl --max-time 60 -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
+  curl --max-time 60 -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/f1ef76e6788929f5fe80294b55306bdada48dfe2/vimrc
+  echo "==> You would better to install the plugins by yourself"
+  echo "==> 1. :PlugInstall"
+  echo "==> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
+  echo "==> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
+  echo "==> Done"
+
+  echo "==> Install neovim"
+  # Architecture check for neovim
+  if [[ $(uname -m) != "x86_64" ]]; then
+    echo "Unsupported architecture: $(uname -m). Neovim x86_64 binary required."
+    echo "Please download manually from https://github.com/neovim/neovim/releases"
+    exit 1
+  fi
+
+  mkdir -p ~/Download
+  cd ~/Download
+  [[ -f nvim-linux-x86_64.tar.gz ]] && rm -f nvim-linux-x86_64.tar.gz
+  wget --max-time 60 https://github.com/neovim/neovim/releases/download/v0.11.6/nvim-linux-x86_64.tar.gz
+  sudo rm -rf /opt/nvim
+  tar -xzf nvim-linux-x86_64.tar.gz
+  sudo mv nvim-linux-x86_64 /opt/nvim
+  cd -
+  sudo rm /usr/bin/vi
+  sudo ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim
+  sudo ln -s /opt/nvim/bin/nvim /usr/bin/vi
+  if [[ -d ~/.config/nvim ]]; then
+    echo "==> ~/.config/nvim exists, removing..."
+    rm -rf ~/.config/nvim
+  fi
+  git clone --depth 1 https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
+  echo "==> Done"
+
+  echo "==> Update default editor as /usr/bin/vim.basic"
+  sudo update-alternatives --set editor /usr/bin/vim.basic
+  echo "==> Once failed try \"sudo update-alternatives --config editor\""
+}
+
+# Setup pyenv (Python version manager) and Python tools
+setup_pyenv() {
+  # Install pyenv for Python version management
+  # see https://github.com/pyenv/pyenv
+  curl --max-time 60 -fsSL https://pyenv.run | bash || { echo "Failed to install pyenv"; exit 1; }
+  grep -q 'PYENV_ROOT' ~/.zshrc || echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+  grep -q '$PYENV_ROOT/bin' ~/.zshrc || echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+  grep -q 'pyenv init' ~/.zshrc || echo 'eval "$(pyenv init - zsh)"' >> ~/.zshrc
+
+  # Source pyenv for current session
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/bin:$PATH"
+  eval "$(pyenv init - zsh)"
+
+  # Install latest Python version (skip if already installed)
+  if pyenv versions | grep -q '3.12'; then
+    echo "==> Python 3.12 already installed, skipping..."
+  else
+    pyenv install 3.12 || { echo "Failed to install Python 3.12"; exit 1; }
+  fi
+  pyenv global 3.12 || { echo "Failed to set global Python version"; exit 1; }
+
+  # Install uv
+  curl -LsSf https://astral.sh/uv/install.sh | sh || { echo "Failed to install uv"; exit 1; }
+}
+
+##------------------------------------------------------------------------------
+## Main Entry Point
+##------------------------------------------------------------------------------
+
+install() {
+  setup_system_deps
+  setup_git_account
+  setup_tmux
+  setup_zsh
+  setup_git_extras
+  setup_volta
+  setup_vim
+  setup_pyenv
+
+  exit 0
+}
+
+install
