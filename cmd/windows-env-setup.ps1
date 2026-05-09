@@ -8,11 +8,17 @@
 #   PowerToys, PSReadLine, and WSL.
 #
 # Usage:
-#   .\windows-env-configure.ps1 [-Proxy PROXY] [-SkipWSL]
+#   .\windows-env-setup.ps1 [OPTIONS]
 #
 # Options:
-#   -Proxy PROXY   HTTP/HTTPS proxy server (e.g., "localhost:7890")
-#   -SkipWSL      Skip WSL installation
+#   -Proxy PROXY                        HTTP/HTTPS proxy server (e.g., "localhost:7890")
+#   -SkipWSL                           Skip WSL installation
+#   -Help, -h                          Show this help message
+#
+# Examples:
+#   .\windows-env-setup.ps1                           # Full setup
+#   .\windows-env-setup.ps1 -Proxy localhost:7890     # Use proxy for WSL install
+#   .\windows-env-setup.ps1 -SkipWSL                  # Skip WSL installation
 #
 # Requirements:
 #   - Windows 10/11
@@ -23,10 +29,20 @@
 
 param(
     [string]$Proxy = "",
-    [switch]$SkipWSL
+    [switch]$SkipWSL,
+    [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
+
+function usage {
+    Write-Host "Usage: $($MyInvocation.ScriptName) [OPTIONS]"
+    Write-Host "Options:"
+    Write-Host "  -Proxy PROXY                        HTTP/HTTPS proxy server (e.g., `"localhost:7890`")"
+    Write-Host "  -SkipWSL                            Skip WSL installation"
+    Write-Host "  -Help, -h                           Show this help message"
+    exit 0
+}
 
 function write_info {
     param([string]$Message)
@@ -38,6 +54,9 @@ function write_error {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
     exit 1
 }
+
+# Handle help flag
+if ($Help) { usage }
 
 function install_chocolatey {
     write_info "Installing Chocolatey..."
@@ -118,6 +137,7 @@ function setup_wsl {
 
 function install {
     write_info "Starting Windows development environment setup..."
+
     install_chocolatey
     setup_git_account
     install_volta
@@ -126,6 +146,7 @@ function install {
     install_powertoys
     install_psreadline
     setup_wsl
+
     write_info "Setup complete!"
 }
 
