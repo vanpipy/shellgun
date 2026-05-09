@@ -104,12 +104,12 @@ setup_git_extras() {
   echo "==> Install git-extras"
   mkdir -p ~/Project
   if [[ -d ~/Project/git-extras ]]; then
-    echo "==> ~/Project/git-extras exists, removing..."
-    rm -rf ~/Project/git-extras
+    echo "==> ~/Project/git-extras exists, skipping..."
+  else
+    git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras || { echo "Failed to clone git-extras"; exit 1; }
+    grep -q 'git-extras-completion' ~/.zshrc || sed -i '$a\source ~/Project/git-extras/etc/git-extras-completion.zsh' ~/.zshrc
+    echo "==> Done"
   fi
-  git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras || { echo "Failed to clone git-extras"; exit 1; }
-  grep -q 'git-extras-completion' ~/.zshrc || sed -i '$a\source ~/Project/git-extras/etc/git-extras-completion.zsh' ~/.zshrc
-  echo "==> Done"
 }
 
 # Setup volta (Node.js version manager) and package managers
