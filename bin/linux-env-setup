@@ -71,35 +71,32 @@ setup_git_account() {
 setup_tmux() {
   echo "==> Install ohmytmux"
   if [[ -d ~/.tmux ]]; then
-    echo "==> ~/.tmux exists, removing..."
-    rm -rf ~/.tmux
+    echo "==> ~/.tmux exists, skipping..."
+  else
+    git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
+    ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+    echo
+    if is_wsl; then
+      echo "==> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
+      echo "==> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
+    fi
+    echo "==> Done"
   fi
-  git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
-  ln -s -f .tmux/.tmux.conf ~/.tmux.conf
-  echo
-
-  if is_wsl; then
-    echo "==> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
-    echo "==> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
-  fi
-  echo "==> Done"
 }
 
 # Setup zsh with ohmyzsh and plugins
 setup_zsh() {
   echo "==> Install ohmyzsh and plugins"
   if [[ -d ~/.oh-my-zsh ]]; then
-    echo "==> ~/.oh-my-zsh exists, removing..."
-    rm -rf ~/.oh-my-zsh
+    echo "==> ~/.oh-my-zsh exists, skipping..."
+  else
+    git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+    cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+    chsh -s /bin/zsh
+    sed -i 's/ZSH_THEME=".\+"/ZSH_THEME="bira"/' ~/.zshrc
+    sed -i '$a\set -o vi' ~/.zshrc
+    echo "==> Done"
   fi
-  git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
-  cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-  chsh -s /bin/zsh
-
-  sed -i 's/ZSH_THEME=".\+"/ZSH_THEME="bira"/' ~/.zshrc
-
-  sed -i '$a\set -o vi' ~/.zshrc
-  echo "==> Done"
 }
 
 # Setup git-extras for additional git commands
@@ -119,17 +116,16 @@ setup_git_extras() {
 setup_volta() {
   echo "==> Install node version manager (Volta) and package managers"
   if [[ -d ~/.volta ]]; then
-    echo "==> ~/.volta exists, removing..."
-    rm -rf ~/.volta
+    echo "==> ~/.volta exists, skipping..."
+  else
+    curl https://get.volta.sh | bash
+    export VOLTA_HOME="$HOME/.volta"
+    [[ ":$PATH:" == *":$VOLTA_HOME/bin:"* ]] || export PATH="$VOLTA_HOME/bin:$PATH"
+    volta install node || { echo "Failed to install node"; exit 1; }
+    volta install pnpm || { echo "Failed to install pnpm"; exit 1; }
+    volta install bun || { echo "Failed to install bun"; exit 1; }
+    echo "==> Done"
   fi
-  curl https://get.volta.sh | bash
-  export VOLTA_HOME="$HOME/.volta"
-  [[ ":$PATH:" == *":$VOLTA_HOME/bin:"* ]] || export PATH="$VOLTA_HOME/bin:$PATH"
-
-  volta install node || { echo "Failed to install node"; exit 1; }
-  volta install pnpm || { echo "Failed to install pnpm"; exit 1; }
-  volta install bun || { echo "Failed to install bun"; exit 1; }
-  echo "==> Done"
 }
 
 # Setup vim and neovim configuration
