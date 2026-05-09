@@ -10,7 +10,16 @@
 #   Kali Linux distributions.
 #
 # Usage:
-#   ./linux-env-configure
+#   ./linux-env-setup [OPTIONS]
+#
+# Options:
+#   --neovim-version VERSION, -neo VERSION  Neovim version to install (default: 0.12.1)
+#   -h, --help                            Show this help message
+#
+# Examples:
+#   ./linux-env-setup                          # Install with default neovim v0.12.1
+#   ./linux-env-setup -neo 0.10.0              # Install neovim v0.10.0
+#   ./linux-env-setup --neovim-version 0.11.0  # Install neovim v0.11.0
 #
 # Requirements:
 #   - Ubuntu or Kali Linux
@@ -131,6 +140,7 @@ setup_volta() {
 
 # Setup vim and neovim configuration
 setup_vim() {
+  local nvim_version="${1:-0.12.1}"
   echo "==> Initialize vimrc"
   mkdir -p ~/.vim/autoload
   curl --max-time 60 -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
@@ -141,7 +151,7 @@ setup_vim() {
   echo "==> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
   echo "==> Done"
 
-  echo "==> Install neovim"
+  echo "==> Install neovim v${nvim_version}"
   # Architecture check for neovim
   if [[ $(uname -m) != "x86_64" ]]; then
     echo "Unsupported architecture: $(uname -m). Neovim x86_64 binary required."
@@ -152,7 +162,7 @@ setup_vim() {
   mkdir -p ~/Download
   cd ~/Download
   [[ -f nvim-linux-x86_64.tar.gz ]] && rm -f nvim-linux-x86_64.tar.gz
-  wget https://github.com/neovim/neovim/releases/download/v0.12.1/nvim-linux-x86_64.tar.gz
+  curl -fsSL -o nvim-linux-x86_64.tar.gz "https://github.com/neovim/neovim/releases/download/v${nvim_version}/nvim-linux-x86_64.tar.gz" || { echo "Failed to download neovim v${nvim_version}"; exit 1; }
   sudo rm -rf /opt/nvim
   tar -xzf nvim-linux-x86_64.tar.gz
   sudo mv nvim-linux-x86_64 /opt/nvim
@@ -204,17 +214,64 @@ setup_pyenv() {
 ## Main Entry Point
 ##------------------------------------------------------------------------------
 
+usage() {
+  echo "Usage: $0 [OPTIONS]"
+  echo "Options:"
+  echo "  --neovim-version VERSION, -neo VERSION  Neovim version to install (default: 0.12.1)"
+  echo "  -h, --help                            Show this help message"
+  exit 0
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        usage
+        ;;
+      -neo|--neovim-version)
+        if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
+          echo "Error: --neovim-version requires a value" >&2
+          exit 1
+        fi
+        NVIM_VERSION="$2"
+        shift 2
+        ;;
+      -*)
+        echo "Unknown option: $1" >&2
+        exit 1
+        ;;
+      *)
+        echo "Unknown argument: $1" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+NVIM_VERSION="0.12.1"
+
 install() {
+  parse_args "$@"
+
   setup_system_deps
   setup_git_account
   setup_tmux
   setup_zsh
   setup_git_extras
   setup_volta
-  setup_vim
+  setup_vim "$NVIM_VERSION"
   # setup_pyenv
 
   exit 0
 }
 
-install
+# Handle help flag before running install
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      ;;
+  esac
+done
+
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && install "$@"
