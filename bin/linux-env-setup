@@ -155,7 +155,7 @@ setup_vim() {
   mkdir -p ~/Download
   cd ~/Download
   [[ -f nvim-linux-x86_64.tar.gz ]] && rm -f nvim-linux-x86_64.tar.gz
-  wget --max-time 60 https://github.com/neovim/neovim/releases/download/v0.11.6/nvim-linux-x86_64.tar.gz
+  wget --max-time 60 https://github.com/neovim/neovim/releases/download/v0.12.1/nvim-linux-x86_64.tar.gz
   sudo rm -rf /opt/nvim
   tar -xzf nvim-linux-x86_64.tar.gz
   sudo mv nvim-linux-x86_64 /opt/nvim
