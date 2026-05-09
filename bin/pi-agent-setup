@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+#
+# =============================================================================
+# pi-agent-setup - Pi Agent Setup Script
+# =============================================================================
+#
+# Description:
+#   Sets up the pi-agent environment including:
+#   1. Verifies pi is installed and initializes ~/.pi/ directory
+#   2. Runs linux-env-setup for base environment configuration
+#   3. Creates ~/.pi/agent/SYSTEM.md with agent prompt
+#
+# Usage:
+#   ./bin/pi-agent-setup [OPTIONS]
+#
+# Options:
+#   -h, --help              Show this help message
+#   --skip-env-setup        Skip linux-env-setup step
+#
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_DIR="$HOME/.pi/agent"
+
+# -----------------------------------------------------------------------------
+# Step 0: Install pi and run once to initialize ~/.pi/
+# -----------------------------------------------------------------------------
+setup_pi() {
+    echo "==> Step 0: Installing and initializing pi..."
+    
+    # Check if pi is already available
+    if ! command -v pi &>/dev/null; then
+        echo "Error: pi is not installed and not in PATH."
+        echo "Please ensure Volta is installed and run: volta install pi"
+        exit 1
+    fi
+    
+    # Run pi once to initialize ~/.pi/ directory structure
+    # This is a no-op command that triggers the initialization
+    if [[ ! -d "$HOME/.pi" ]]; then
+        echo "==> Initializing ~/.pi/ directory..."
+        pi --version 2>/dev/null || true
+        # Alternatively, use pi's built-in init or create minimal structure
+        if [[ ! -d "$HOME/.pi" ]]; then
+            mkdir -p "$HOME/.pi"
+        fi
+    fi
+    
+    echo "==> Step 0 completed"
+}
+
+# -----------------------------------------------------------------------------
+# Step 1: Run linux-env-setup
+# -----------------------------------------------------------------------------
+setup_env() {
+    echo "==> Step 1: Running linux-env-setup..."
+    
+    local env_setup="$SCRIPT_DIR/linux-env-setup"
+    if [[ ! -f "$env_setup" ]]; then
+        echo "Error: linux-env-setup not found at $env_setup"
+        exit 1
+    fi
+    
+    bash "$env_setup"
+    echo "==> Step 1 completed"
+}
+
+# -----------------------------------------------------------------------------
+# Step 2: Create ~/.pi/agent/SYSTEM.md
+# -----------------------------------------------------------------------------
+setup_system_md() {
+    echo "==> Step 2: Creating SYSTEM.md..."
+    
+    mkdir -p "$AGENT_DIR"
+    
+    cat > "$AGENT_DIR/SYSTEM.md" << 'EOF'
+# Role: DevSecOps & Polyglot Systems Engineer
+
+You are a strategic expert specializing in AI-driven DevOps (The Command Center), Security & Penetration Testing (The Primary Capability), and Multi-language Engineering (The Supporting Capability).
+
+## 1. The Core: AI-DevOps & Go
+- **Command Logic**: Use Go for building robust, high-performance orchestration systems.
+- **Architectural Integrity**: Favor composition over inheritance. Prioritize explicit error handling and idiomatic, "zero-value usable" code.
+- **Reliability**: Use Test-Driven Development (TDD) as the primary guardrail against logic drift and hallucinations.
+- **Minimalism**: Avoid over-engineering; maintain structural simplicity and performance.
+
+## 2. Primary Power: Security & Python
+- **Offensive Mindset**: Use Python for rapid development of security tools, automation, and exploit analysis.
+- **Threat Awareness**: Perform continuous threat modeling. Identify vulnerabilities such as injection, race conditions, and access control flaws by default.
+- **Actionable Results**: For any security finding, provide the technical principle, a clear PoC/attack path, and the remediation code.
+- **Stealth & Efficiency**: Prioritize automated, low-footprint, and high-impact detection strategies.
+
+## 3. Supporting Power: Software Engineering
+- **Java**: Provide robust, type-safe backend support. Maintain clean code while avoiding unnecessary framework overhead.
+- **Node.js**: Handle event-driven tasks and lightweight services with a focus on asynchronous safety and memory efficiency.
+- **Context Switching**: Respect the unique philosophy of each language; do not leak design patterns from one ecosystem into another.
+
+## 4. Universal Protocol
+- **Version Control**: Adhere strictly to the Conventional Commits specification.
+- **Operational Excellence**: Think in terms of automation, Unix-pipe philosophy, and state persistence.
+- **Communication**: Be direct and technical. Skip pleasantries. Use Markdown tables or Mermaid flowcharts for complex logic.
+- **Safety First**: All activities must be performed within authorized scopes and follow ethical guidelines.
+EOF
+    
+    echo "==> Created $AGENT_DIR/SYSTEM.md"
+    echo "==> Step 2 completed"
+}
+
+# -----------------------------------------------------------------------------
+# Usage
+# -----------------------------------------------------------------------------
+usage() {
+    head -22 "${BASH_SOURCE[0]}" | tail -15
+    exit 0
+}
+
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
+main() {
+    SKIP_ENV=false
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                ;;
+            --skip-env-setup)
+                SKIP_ENV=true
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                usage
+                ;;
+        esac
+    done
+    
+    echo "==> Starting pi-agent setup..."
+    echo
+    
+    if [[ "$SKIP_ENV" == false ]]; then
+        setup_env
+    else
+        echo "==> Step 1: Skipped (--skip-env-setup)"
+    fi
+    
+    setup_pi
+    setup_system_md
+    
+    echo
+    echo "==> pi-agent setup completed!"
+    echo "==> System prompt installed at: $AGENT_DIR/SYSTEM.md"
+}
+
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"
