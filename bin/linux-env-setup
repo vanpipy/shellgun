@@ -123,6 +123,7 @@ setup_volta() {
     [[ ":$PATH:" == *":$VOLTA_HOME/bin:"* ]] || export PATH="$VOLTA_HOME/bin:$PATH"
     volta install node || { echo "Failed to install node"; exit 1; }
     volta install pnpm || { echo "Failed to install pnpm"; exit 1; }
+    volta install yarn || { echo "Failed to install yarn"; exit 1; }
     volta install bun || { echo "Failed to install bun"; exit 1; }
     echo "==> Done"
   fi
