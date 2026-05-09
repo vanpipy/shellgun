@@ -94,16 +94,10 @@ function install_volta {
 }
 
 function install_python {
-    write_info "Installing Python via Chocolatey and uv..."
-    # Install Python via Chocolatey
+    write_info "Installing Python and uv via Chocolatey..."
     choco install python --version=3.12.0 -y
+    choco install uv -y
 
-    # Install uv for package management
-    if (Get-Command uv -ErrorAction SilentlyContinue) {
-        write_info "uv already installed, skipping..."
-    } else {
-        irm https://astral.sh/uv/install.ps1 | iex
-    }
     # Reload PATH
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
