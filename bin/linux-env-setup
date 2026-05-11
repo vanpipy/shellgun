@@ -58,11 +58,27 @@ setup_system_deps() {
     sudo sed -i 's/^deb/# deb/g' /etc/apt/sources.list || { echo "Failed to modify sources.list"; exit 1; }
     sudo sed -i '$a\deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' /etc/apt/sources.list || { echo "Failed to add sources.list entry"; exit 1; }
     sudo apt update || { echo "Failed to update apt"; exit 1; }
-    sudo apt install -y git tmux tree cmake gcc zsh python3-pip || { echo "Failed to install dependencies"; exit 1; }
+    sudo apt install -y git tmux tree cmake gcc zsh python3-pip \
+      ripgrep fd-find \
+      build-essential \
+      luarocks \
+      ghostscript \
+      texlive-base texlive-binaries texlive-bibtex-extra biber latexmk \
+      zathura zathura-pdf-poppler \
+      lazygit \
+      || { echo "Failed to install dependencies"; exit 1; }
   else
     echo "==> Detected Ubuntu"
     sudo apt update || { echo "Failed to update apt"; exit 1; }
-    sudo apt install -y git tmux tree cmake gcc zsh python3-pip || { echo "Failed to install dependencies"; exit 1; }
+    sudo apt install -y git tmux tree cmake gcc zsh python3-pip \
+      ripgrep fd-find \
+      build-essential \
+      luarocks \
+      ghostscript \
+      texlive-base texlive-binaries texlive-bibtex-extra biber latexmk \
+      zathura zathura-pdf-poppler \
+      lazygit \
+      || { echo "Failed to install dependencies"; exit 1; }
   fi
 }
 
