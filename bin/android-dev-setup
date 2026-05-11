@@ -1,0 +1,725 @@
+#!/usr/bin/env bash
+#
+# android-dev-setup - Android Development Environment Setup Script
+#
+# This script installs and configures the Android SDK, build tools, NDK, and Java
+# required for Android development on Linux.
+#
+# Usage:
+#   ./bin/android-dev-setup [OPTIONS]
+#
+# Options:
+#   --android-version <version>    Target Android API level (default: android-36)
+#   --build-tools <version>       Build tools version (default: 36.0.0)
+#   --ndk-version <version>       NDK version (default: 27.1.12297006)
+#   --java-version <version>       Java JDK version via SDKMAN (default: 17.0.19-zulu)
+#   --sdk-root <path>             Android SDK install location (default: $HOME/Android/Sdk)
+#   --skip-java                   Skip Java installation (if already installed)
+#   --yes                         Accept all licenses non-interactively
+#   --help                        Show this help message
+#
+# Examples:
+#   ./bin/android-dev-setup                                    # Use defaults
+#   ./bin/android-dev-setup --android-version android-35       # Override API level
+#   ./bin/android-dev-setup --java-version 21.0.2-zulu         # Use Java 21
+#   ./bin/android-dev-setup --sdk-root /opt/android-sdk        # Custom SDK location
+#
+# Requirements:
+#   - curl (for downloading tools)
+#   - unzip (for extracting packages)
+#   - bash 4.0+ (for associative arrays)
+#
+# ============================================================================
+
+set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+
+# -------------------------------------------------------------------
+# Default configuration values
+# These can be overridden via command-line arguments
+# -------------------------------------------------------------------
+DEFAULT_ANDROID_VERSION="android-36"
+DEFAULT_BUILD_TOOLS="36.0.0"
+DEFAULT_NDK_VERSION="27.1.12297006"
+DEFAULT_JAVA_VERSION="17.0.19-zulu"
+DEFAULT_SDK_ROOT="${HOME}/Android/Sdk"
+
+# -------------------------------------------------------------------
+# Global variables (not intended to be modified by users)
+# -------------------------------------------------------------------
+SDK_ROOT="${DEFAULT_SDK_ROOT}"
+ANDROID_VERSION=""
+BUILD_TOOLS=""
+NDK_VERSION=""
+JAVA_VERSION=""
+SKIP_JAVA=false
+ACCEPT_LICENSES=false
+DRY_RUN=false
+
+# Colors for terminal output (disabled if not a TTY)
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    NC='\033[0m'  # No Color
+else
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' NC=''
+fi
+
+# -----------------------------------------------------------------------------
+# Helper functions for logging and output formatting
+# -----------------------------------------------------------------------------
+
+# Print info message in blue
+info() {
+    printf "${BLUE}[INFO]${NC} %s\n" "$1"
+}
+
+# Print success message in green
+success() {
+    printf "${GREEN}[OK]${NC} %s\n" "$1"
+}
+
+# Print warning message in yellow
+warn() {
+    printf "${YELLOW}[WARN]${NC} %s\n" "$1"
+}
+
+# Print error message in red
+error() {
+    printf "${RED}[ERROR]${NC} %s\n" "$1" >&2
+}
+
+# Print debug message in cyan (only if DEBUG=1)
+debug() {
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        printf "${CYAN}[DEBUG]${NC} %s\n" "$1"
+    fi
+}
+
+# Print a section divider for readability
+section() {
+    printf "\n${BLUE}%s${NC}\n" "----------------------------------------"
+}
+
+# -----------------------------------------------------------------------------
+# show_help - Display usage information and exit
+# -----------------------------------------------------------------------------
+show_help() {
+    grep "^#" "$0" | tail -n +2 | sed 's/^# //' | head -n 24
+    exit 0
+}
+
+# -----------------------------------------------------------------------------
+# parse_args - Parse command-line arguments into variables
+#
+# Supports both `--flag value` and `--flag=value` formats
+# -----------------------------------------------------------------------------
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --android-version)
+                ANDROID_VERSION="$2"
+                shift 2
+                ;;
+            --build-tools)
+                BUILD_TOOLS="$2"
+                shift 2
+                ;;
+            --ndk-version)
+                NDK_VERSION="$2"
+                shift 2
+                ;;
+            --java-version)
+                JAVA_VERSION="$2"
+                shift 2
+                ;;
+            --sdk-root)
+                SDK_ROOT="$2"
+                shift 2
+                ;;
+            --skip-java)
+                SKIP_JAVA=true
+                shift
+                ;;
+            --yes)
+                ACCEPT_LICENSES=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --help)
+                show_help
+                ;;
+            *)
+                error "Unknown option: $1"
+                show_help
+                ;;
+        esac
+    done
+
+    # Apply defaults for any unspecified values
+    ANDROID_VERSION="${ANDROID_VERSION:-$DEFAULT_ANDROID_VERSION}"
+    BUILD_TOOLS="${BUILD_TOOLS:-$DEFAULT_BUILD_TOOLS}"
+    NDK_VERSION="${NDK_VERSION:-$DEFAULT_NDK_VERSION}"
+    JAVA_VERSION="${JAVA_VERSION:-$DEFAULT_JAVA_VERSION}"
+}
+
+# -----------------------------------------------------------------------------
+# check_prerequisites - Verify required tools are installed
+# Exits with error code if any tool is missing
+# -----------------------------------------------------------------------------
+check_prerequisites() {
+    info "Checking prerequisites..."
+
+    local missing=()
+
+    for cmd in curl unzip; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing+=("$cmd")
+        fi
+    done
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        error "Missing required commands: ${missing[*]}"
+        error "Install them with: sudo apt install ${missing[*]}"
+        exit 1
+    fi
+
+    success "All prerequisites satisfied"
+}
+
+# -----------------------------------------------------------------------------
+# check_command_exists - Check if a command exists and return version if possible
+# Arguments:
+#   $1 - command name
+#   $2 - version flag (optional, e.g., "--version")
+# Returns:
+#   0 if command exists, 1 otherwise
+# -----------------------------------------------------------------------------
+check_command_exists() {
+    local cmd="$1"
+    local version_flag="${2:---version}"
+
+    if command -v "$cmd" &> /dev/null; then
+        local version
+        version=$("$cmd" "$version_flag" 2>&1 | head -1 || echo "unknown")
+        debug "Found: $cmd ($version)"
+        return 0
+    fi
+    debug "Not found: $cmd"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# download_file - Download a file with retry logic and error handling
+# Arguments:
+#   $1 - URL to download
+#   $2 - destination path
+#   $3 - max retries (default: 3)
+# Returns:
+#   0 on success, 1 on failure
+# -----------------------------------------------------------------------------
+download_file() {
+    local url="$1"
+    local dest="$2"
+    local max_retries="${3:-3}"
+    local attempt=1
+
+    # Check if file already exists and is valid
+    if [[ -f "$dest" ]] && [[ -s "$dest" ]]; then
+        warn "File already exists: $dest (skipping download)"
+        return 0
+    fi
+
+    # Ensure parent directory exists
+    mkdir -p "$(dirname "$dest")"
+
+    while [[ $attempt -le $max_retries ]]; do
+        info "Downloading ($attempt/$max_retries): $(basename "$url")"
+
+        # Use curl with progress bar, fail on error, follow redirects
+        if curl -fLSs --connect-timeout 30 --max-time 300 \
+            -o "$dest" \
+            -A "android-dev-setup/1.0" \
+            "$url"; then
+
+            # Verify download
+            if [[ -f "$dest" ]] && [[ -s "$dest" ]]; then
+                success "Downloaded: $(basename "$dest") ($(du -h "$dest" | cut -f1))"
+                return 0
+            fi
+        fi
+
+        warn "Download attempt $attempt failed"
+        ((attempt++))
+
+        # Wait before retry (exponential backoff)
+        if [[ $attempt -le $max_retries ]]; then
+            local wait_time=$((attempt * 5))
+            info "Retrying in ${wait_time}s..."
+            sleep "$wait_time"
+        fi
+    done
+
+    # Clean up failed download
+    rm -f "$dest"
+    error "Failed to download after $max_retries attempts: $url"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# download_commandlinetools - Download and install Android command-line tools
+# -----------------------------------------------------------------------------
+download_commandlinetools() {
+    local tools_dir="${SDK_ROOT}/cmdline-tools"
+    local latest_dir="${tools_dir}/latest"
+
+    # Check if already installed
+    if [[ -d "${latest_dir}/bin" ]]; then
+        info "Command-line tools already installed at ${latest_dir}"
+        if [[ -f "${latest_dir}/bin/sdkmanager" ]]; then
+            local current_version
+            current_version=$("${latest_dir}/bin/sdkmanager" --version 2>/dev/null | head -1 || echo "unknown")
+            success "Version: $current_version"
+        fi
+        return 0
+    fi
+
+    info "Installing Android command-line tools..."
+
+    # Ensure directory exists
+    mkdir -p "${tools_dir}"
+
+    # Download command-line tools package
+    local zip_file="/tmp/cmdline-tools.zip"
+    local download_url="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+
+    if ! download_file "$download_url" "$zip_file" 3; then
+        error "Failed to download command-line tools"
+        return 1
+    fi
+
+    info "Extracting command-line tools..."
+
+    # Remove existing cmdline-tools content if any
+    if [[ -d "${tools_dir}/cmdline-tools" ]]; then
+        rm -rf "${tools_dir}/cmdline-tools"
+    fi
+
+    # Extract and reorganize
+    if unzip -q "$zip_file" -d "$tools_dir" 2>/dev/null; then
+        # The zip extracts to cmdline-tools/, rename to latest/
+        if [[ -d "${tools_dir}/cmdline-tools" ]]; then
+            mv "${tools_dir}/cmdline-tools" "${latest_dir}"
+            success "Extracted to ${latest_dir}"
+        fi
+    else
+        rm -f "$zip_file"
+        error "Failed to extract command-line tools"
+        return 1
+    fi
+
+    # Clean up
+    rm -f "$zip_file"
+
+    # Verify installation
+    if [[ -f "${latest_dir}/bin/sdkmanager" ]]; then
+        success "Command-line tools installed successfully"
+    else
+        error "Installation verification failed"
+        return 1
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# configure_environment - Set up shell environment variables
+# Appends configuration to .zshrc or .bashrc
+# -----------------------------------------------------------------------------
+configure_environment() {
+    local shell_rc=""
+
+    if [[ -f "${HOME}/.zshrc" ]]; then
+        shell_rc="${HOME}/.zshrc"
+    elif [[ -f "${HOME}/.bashrc" ]]; then
+        shell_rc="${HOME}/.bashrc"
+    else
+        warn "No .zshrc or .bashrc found. Please configure environment manually."
+        cat << 'EOF'
+
+To complete setup, add these to your shell config:
+
+  export ANDROID_HOME="$HOME/Android/Sdk"
+  export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+  export PATH="$ANDROID_HOME/platform-tools:$PATH"
+  export PATH="$ANDROID_HOME/emulator:$PATH"
+  export PATH="$ANDROID_HOME/tools:$PATH"
+  export PATH="$ANDROID_HOME/tools/bin:$PATH"
+EOF
+        return 1
+    fi
+
+    # Check if already configured
+    if grep -q "ANDROID_HOME" "${shell_rc}" 2>/dev/null; then
+        info "Environment variables already configured in ${shell_rc}"
+        return 0
+    fi
+
+    info "Configuring environment variables in ${shell_rc}..."
+
+    cat >> "${shell_rc}" << EOF
+
+# Android Development Environment (android-dev-setup)
+export ANDROID_HOME="${SDK_ROOT}"
+export ANDROID_SDK_ROOT="\${ANDROID_HOME}"
+export PATH="\${ANDROID_HOME}/cmdline-tools/latest/bin:\$PATH"
+export PATH="\${ANDROID_HOME}/platform-tools:\$PATH"
+export PATH="\${ANDROID_HOME}/emulator:\$PATH"
+export PATH="\${ANDROID_HOME}/tools:\$PATH"
+export PATH="\${ANDROID_HOME}/tools/bin:\$PATH"
+EOF
+
+    success "Environment configured. Run 'source ${shell_rc}' or restart your shell."
+}
+
+# -----------------------------------------------------------------------------
+# accept_licenses - Accept all Android SDK licenses
+# Required before installing packages
+# -----------------------------------------------------------------------------
+accept_licenses() {
+    info "Accepting Android SDK licenses..."
+
+    local license_dir="${SDK_ROOT}/licenses"
+    mkdir -p "${license_dir}"
+
+    if [[ "${ACCEPT_LICENSES}" == true ]]; then
+        # Pre-accept common licenses non-interactively
+        info "Accepting licenses in non-interactive mode..."
+        cat > "${license_dir}/android-sdk-license" << 'EOF'
+24333f8a63b6825ea9c5514f83c2829b004d1fee
+d56f5187479451eabf01fb78af6dfcb131a6481e
+84831b9409646a918e30573bab4c9c91346d8abd
+EOF
+
+        cat > "${license_dir}/android-sdk-arm-dbt-license" << 'EOF'
+859f317696f67ef3d7f30a50a5560e7834b43903
+EOF
+
+        cat > "${license_dir}/intel-android-extra-license" << 'EOF'
+d975f751698a77b662f1254ddbeed3901e976f5a
+1e4ddf3f8ca94a5e6e5e7e4c4d7b8a3f2e5d6c7b
+EOF
+
+        cat > "${license_dir}/google-gdk-license" << 'EOF'
+24333f8a63b6825ea9c5514f83c2829b004d1fee
+EOF
+
+        success "Licenses accepted (non-interactive mode)"
+    else
+        # Interactive acceptance via sdkmanager
+        info "Accepting licenses interactively..."
+        if yes | sdkmanager --licenses > /dev/null 2>&1; then
+            success "Licenses accepted"
+        else
+            warn "License acceptance may have issues. Run 'yes | sdkmanager --licenses' manually."
+        fi
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# is_package_installed - Check if an SDK package is already installed
+# Arguments:
+#   $1 - package name (e.g., "platforms;android-36")
+# Returns:
+#   0 if installed, 1 otherwise
+# -----------------------------------------------------------------------------
+is_package_installed() {
+    local package="$1"
+
+    if sdkmanager --list_installed 2>/dev/null | grep -q "^  $package"; then
+        debug "Package already installed: $package"
+        return 0
+    fi
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# install_sdk_component - Install a single SDK component with fallback
+# Arguments:
+#   $1 - package specification (e.g., "platforms;android-36")
+#   $2 - description for logging (e.g., "Android Platform 36")
+# Returns:
+#   0 on success, 1 on failure
+# -----------------------------------------------------------------------------
+install_sdk_component() {
+    local package="$1"
+    local description="${2:-$package}"
+
+    # Check if already installed
+    if is_package_installed "$package"; then
+        success "Already installed: $description"
+        return 0
+    fi
+
+    info "Installing: $description..."
+
+    if sdkmanager "$package" 2>&1 | tee /tmp/sdk_install.log; then
+        success "Installed: $description"
+        rm -f /tmp/sdk_install.log
+        return 0
+    else
+        warn "Failed to install: $description"
+        if [[ -f /tmp/sdk_install.log ]]; then
+            debug "$(cat /tmp/sdk_install.log | tail -5)"
+        fi
+        return 1
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# install_sdk_components - Install Android SDK, build-tools, NDK, and platform
+# -----------------------------------------------------------------------------
+install_sdk_components() {
+    info "Installing Android SDK components..."
+    info "  Platform: ${ANDROID_VERSION}"
+    info "  Build Tools: ${BUILD_TOOLS}"
+    info "  NDK: ${NDK_VERSION}"
+
+    # Ensure directories exist
+    mkdir -p "${SDK_ROOT}/platform-tools"
+    mkdir -p "${SDK_ROOT}/emulator"
+    mkdir -p "${SDK_ROOT}/tools/bin"
+
+    local failed=0
+
+    # Install platform
+    if ! install_sdk_component "platforms;${ANDROID_VERSION}" "Android Platform ${ANDROID_VERSION}"; then
+        ((failed++))
+    fi
+
+    # Install build-tools
+    if ! install_sdk_component "build-tools;${BUILD_TOOLS}" "Build Tools ${BUILD_TOOLS}"; then
+        ((failed++))
+    fi
+
+    # Install platform-tools
+    if ! install_sdk_component "platform-tools" "Platform Tools (adb)"; then
+        ((failed++))
+    fi
+
+    # Install NDK
+    if ! install_sdk_component "ndk;${NDK_VERSION}" "NDK ${NDK_VERSION}"; then
+        ((failed++))
+    fi
+
+    if [[ $failed -gt 0 ]]; then
+        error "$failed component(s) failed to install"
+        return 1
+    fi
+
+    success "All SDK components installed successfully"
+}
+
+# -----------------------------------------------------------------------------
+# setup_java - Install Java JDK via SDKMAN
+# -----------------------------------------------------------------------------
+setup_java() {
+    if [[ "${SKIP_JAVA}" == true ]]; then
+        info "Skipping Java installation (--skip-java)"
+        return 0
+    fi
+
+    # Check if Java is already installed and accessible
+    if command -v java &> /dev/null; then
+        local java_version
+        java_version=$(java -version 2>&1 | head -1)
+        info "Java already available: $java_version"
+        return 0
+    fi
+
+    # Check if SDKMAN is already installed
+    if [[ -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
+        info "SDKMAN already installed, installing Java ${JAVA_VERSION}..."
+
+        source "${HOME}/.sdkman/bin/sdkman-init.sh"
+
+        # Check if this specific version is installed
+        if sdk list java 2>/dev/null | grep -q "${JAVA_VERSION}"; then
+            if sdk current java 2>/dev/null | grep -q "${JAVA_VERSION}"; then
+                success "Java ${JAVA_VERSION} is active"
+                return 0
+            fi
+
+            info "Installing Java ${JAVA_VERSION}..."
+            if sdk install java "${JAVA_VERSION}" -y 2>&1 | tee /tmp/java_install.log; then
+                success "Java ${JAVA_VERSION} installed"
+                rm -f /tmp/java_install.log
+                return 0
+            else
+                warn "Failed to install Java ${JAVA_VERSION}"
+                return 1
+            fi
+        else
+            warn "Java ${JAVA_VERSION} not found in SDKMAN repository"
+            return 1
+        fi
+    fi
+
+    # Install SDKMAN
+    info "Installing SDKMAN..."
+
+    if command -v curl &> /dev/null; then
+        if curl -s "https://get.sdkman.io" | bash 2>&1 | tee /tmp/sdkman_install.log; then
+            success "SDKMAN installed"
+            rm -f /tmp/sdkman_install.log
+        else
+            error "Failed to install SDKMAN"
+            return 1
+        fi
+    else
+        error "curl not available, cannot install SDKMAN"
+        return 1
+    fi
+
+    # Verify SDKMAN installation
+    if [[ ! -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
+        error "SDKMAN installation failed"
+        return 1
+    fi
+
+    # Initialize SDKMAN and install Java
+    source "${HOME}/.sdkman/bin/sdkman-init.sh"
+
+    info "Installing Java ${JAVA_VERSION}..."
+    if sdk install java "${JAVA_VERSION}" -y 2>&1 | tee /tmp/java_install.log; then
+        success "Java ${JAVA_VERSION} installed successfully"
+        rm -f /tmp/java_install.log
+        return 0
+    else
+        error "Failed to install Java ${JAVA_VERSION}"
+        return 1
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# verify_installation - Check that all components are installed correctly
+# -----------------------------------------------------------------------------
+verify_installation() {
+    info "Verifying installation..."
+
+    local issues=0
+
+    # Check sdkmanager
+    if check_command_exists "sdkmanager" "--version"; then
+        success "sdkmanager: available"
+    else
+        error "sdkmanager not found in PATH"
+        ((issues++))
+    fi
+
+    # Check adb
+    if check_command_exists "adb" "--version"; then
+        success "adb: available"
+    else
+        warn "adb not in PATH (run 'source ~/.zshrc' or restart shell)"
+    fi
+
+    # Check Java
+    if check_command_exists "java" "-version"; then
+        success "java: available"
+    else
+        warn "java not in PATH (run 'source ~/.zshrc' or restart shell)"
+    fi
+
+    # Check installed packages via sdkmanager
+    if command -v sdkmanager &> /dev/null; then
+        info "Installed SDK packages:"
+
+        local packages=(
+            "platforms;${ANDROID_VERSION}"
+            "build-tools;${BUILD_TOOLS}"
+            "platform-tools"
+            "ndk;${NDK_VERSION}"
+        )
+
+        for pkg in "${packages[@]}"; do
+            if is_package_installed "$pkg"; then
+                success "  ✓ $pkg"
+            else
+                error "  ✗ $pkg (not installed)"
+                ((issues++))
+            fi
+        done
+    fi
+
+    echo ""
+    if [[ ${issues} -gt 0 ]]; then
+        error "Installation verification failed with ${issues} issue(s)"
+        return 1
+    fi
+
+    success "All components verified successfully!"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# main - Entry point for the script
+# -----------------------------------------------------------------------------
+main() {
+    # Parse command-line arguments
+    parse_args "$@"
+
+    # Dry run mode - just show what would be done
+    if [[ "${DRY_RUN}" == true ]]; then
+        info "DRY RUN MODE - No changes will be made"
+        echo ""
+        info "Configuration:"
+        info "  SDK Root:        ${SDK_ROOT}"
+        info "  Android Version: ${ANDROID_VERSION}"
+        info "  Build Tools:     ${BUILD_TOOLS}"
+        info "  NDK Version:     ${NDK_VERSION}"
+        info "  Java Version:    ${JAVA_VERSION}"
+        info "  Skip Java:       ${SKIP_JAVA}"
+        info "  Accept Licenses: ${ACCEPT_LICENSES}"
+        exit 0
+    fi
+
+    echo ""
+    info "Android Development Environment Setup"
+    info "======================================"
+    echo ""
+
+    info "Configuration:"
+    info "  SDK Root:        ${SDK_ROOT}"
+    info "  Android Version: ${ANDROID_VERSION}"
+    info "  Build Tools:     ${BUILD_TOOLS}"
+    info "  NDK Version:     ${NDK_VERSION}"
+    info "  Java Version:    ${JAVA_VERSION}"
+    echo ""
+
+    # Execute setup steps
+    check_prerequisites
+    download_commandlinetools || exit 1
+    configure_environment
+    accept_licenses
+    install_sdk_components || exit 1
+    setup_java || warn "Java setup had issues"
+    verify_installation
+
+    echo ""
+    section
+    success "Setup complete!"
+    echo ""
+    info "Next steps:"
+    info "  1. Run: source ~/.zshrc  (or restart your terminal)"
+    info "  2. Verify: adb --version"
+    info "  3. Verify: java -version"
+    info "  4. Start building: ./gradlew build"
+    echo ""
+}
+
+# Run main function with all provided arguments
+main "$@"
