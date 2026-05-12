@@ -6,8 +6,8 @@
 #
 # Description:
 #   Automated setup script for Linux development environment including git, tmux,
-#   zsh, neovim, volta (Node.js), and pyenv (Python). Supports both Ubuntu and
-#   Kali Linux distributions.
+#   zsh, neovim, volta (Node.js), g (Go), and pyenv (Python). Supports both Ubuntu
+#   and Kali Linux distributions.
 #
 # Usage:
 #   ./linux-env-setup [OPTIONS]
@@ -155,6 +155,39 @@ setup_volta() {
   fi
 }
 
+# Setup g (Go version manager) and install latest Go
+setup_go() {
+  echo "==> Install g (Go version manager)"
+  if [[ -d ~/.g ]]; then
+    echo "==> ~/.g exists, skipping..."
+  else
+    # Use China mirror for faster download in certain regions
+    export G_MIRROR="https://golang.google.cn/dl/"
+    curl -sSL https://raw.githubusercontent.com/voidint/g/master/install.sh | bash || { echo "Failed to install g"; exit 1; }
+    echo "==> Done"
+  fi
+
+  # Source the g environment for current session
+  source "$HOME/.g/env" 2>/dev/null || true
+
+  # Add g setup to zshrc if not already present
+  if ! grep -qF '# g shell setup' ~/.zshrc 2>/dev/null; then
+    cat >> ~/.zshrc <<'EOF'
+
+# g shell setup
+export G_MIRROR="https://golang.google.cn/dl/"
+[ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"
+EOF
+  else
+    echo "==> g shell setup already in zshrc, skipping..."
+  fi
+
+  # Install latest Go version
+  echo "==> Install latest Go version"
+  g install latest || { echo "Failed to install latest Go"; exit 1; }
+  echo "==> Done"
+}
+
 # Setup vim and neovim configuration
 setup_vim() {
   local nvim_version="${1:-0.12.1}"
@@ -276,6 +309,7 @@ install() {
   setup_zsh
   setup_git_extras
   setup_volta
+  setup_go
   setup_vim "$NVIM_VERSION"
   # setup_pyenv
 
