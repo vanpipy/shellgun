@@ -25,6 +25,9 @@
 #   - PowerShell 5.1+ or PowerShell 7+
 #   - Administrator privileges for Chocolatey
 #
+#
+# Advice:
+#   - run "powershell.exe -ExecutionPolicy Bypass -File .\cmd\windows-env-setup.ps1" when catch "UnauthorizedAccess"
 # =============================================================================
 
 param(
