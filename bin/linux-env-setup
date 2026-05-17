@@ -1,328 +1,471 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # =============================================================================
-# linux-env-configure - Linux Development Environment Setup Script
+# linux-env-setup - Linux Development Environment Setup Script
 # =============================================================================
 #
 # Description:
 #   Automated setup script for Linux development environment including git, tmux,
-#   zsh, neovim, volta (Node.js), g (Go), and pyenv (Python). Supports both Ubuntu
-#   and Kali Linux distributions.
+#   zsh, neovim, volta (Node.js), gvm (Go), and pyenv (Python).
 #
 # Usage:
 #   ./linux-env-setup [OPTIONS]
 #
 # Options:
-#   --neovim-version VERSION, -neo VERSION  Neovim version to install (default: 0.12.1)
-#   -h, --help                            Show this help message
+#   --neovim-version VERSION  Neovim version (default: 0.12.1)
+#   --reinstall TOOL         Reinstall tool (volta, gvm, neovim)
+#   --proxy PROXY            Proxy (http://, https://, socks://, socks5://, default: http://127.0.0.1:7890)
+#   -h, --help              Show this help message
 #
 # Examples:
-#   ./linux-env-setup                          # Install with default neovim v0.12.1
-#   ./linux-env-setup -neo 0.10.0              # Install neovim v0.10.0
-#   ./linux-env-setup --neovim-version 0.11.0  # Install neovim v0.11.0
+#   ./linux-env-setup --proxy -                           # Disable proxy
+#   ./linux-env-setup --neovim-version 0.10.0            # Custom neovim
+#   ./linux-env-setup --reinstall neovim                 # Force reinstall
 #
-# Requirements:
-#   - Ubuntu or Kali Linux
-#   - Root/sudo access for system package installation
-#   - Internet connection for cloning repositories
+# Requirements: Ubuntu/Kali Linux, sudo access, internet connection
 #
 # =============================================================================
-#
 
 set -euo pipefail
 
+readonly SCRIPT_NAME="${0##*/}"
+readonly DEFAULT_NVIM_VERSION="0.12.1"
+readonly DEFAULT_PROXY="http://127.0.0.1:7890"
+readonly GVM_MIRROR="https://golang.google.cn/dl/"
+readonly PYTHON_VERSION="3.12"
+
 ##------------------------------------------------------------------------------
-## Helper Functions
+## Helpers
 ##------------------------------------------------------------------------------
 
-# Check if running in WSL environment
-is_wsl() {
-  grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null
+log_info()  { echo "==> $1"; }
+log_warn()  { echo "WARNING: $1" >&2; }
+log_error() { echo "ERROR: $1" >&2; exit 1; }
+
+is_wsl() { grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; }
+
+validate_version() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || log_error "Invalid $2: '$1'. Expected semver format"
 }
 
-# Backup /etc/apt/sources.list
-backup_sources_list() {
-  local backup="/etc/apt/sources.list.backup-$(date +%Y%m%d%H%M%S%N)"
-  sudo cp /etc/apt/sources.list "$backup"
+normalize_proxy() {
+  case "$1" in -|*|"") echo "$1" ;; http://*|https://*|socks*://*) echo "$1" ;; *) echo "http://$1" ;; esac
+}
+
+validate_proxy() {
+  [[ "$1" == -* ]] && return 0
+  [[ "$1" =~ ^(https?|socks[45]?):// ]] || log_error "Invalid proxy: '$1'. Must start with http://, https://, socks://, socks4://, or socks5://"
+}
+
+# Append to zshrc only if not already present (checks content, not just pattern)
+append_zshrc() {
+  local line="$1"
+  local pattern="${2:-${line}}"
+  [[ -z "$line" ]] && return 0  # Skip empty lines
+  [[ -f ~/.zshrc ]] && grep -qF -- "$pattern" ~/.zshrc && return 0
+  echo "$line" >> ~/.zshrc
+}
+
+command_exists() { command -v "$1" &>/dev/null; }
+
+download_and_execute() {
+  log_info "Downloading $2..."
+  local temp_script
+  temp_script=$(mktemp) || return 1
+  trap "rm -f '$temp_script'" RETURN EXIT
+
+  if ! curl --max-time 300 -fsSL "$1" -o "$temp_script"; then
+    log_error "Failed to download $2"
+    return 1
+  fi
+
+  # Basic validation - check if file is non-empty and starts with shebang
+  if [[ ! -s "$temp_script" ]] || ! head -1 "$temp_script" | grep -q '^#!'; then
+    log_error "Downloaded file is not a valid script"
+    return 1
+  fi
+
+  log_info "Executing $2 installer..."
+  chmod +x "$temp_script" && bash "$temp_script"
+}
+
+##------------------------------------------------------------------------------
+## Install Status Checks
+##------------------------------------------------------------------------------
+
+nvim_is_installed() {
+  command_exists nvim && nvim --version 2>/dev/null | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+'
+}
+
+volta_is_installed() { command_exists volta; }
+volta_tool_installed() { [[ -n "$(volta list "$1" 2>/dev/null)" ]]; }
+gvm_is_installed() { [[ -x "$HOME/.local/bin/gvm" ]]; }
+
+gvm_activate() {
+  if [[ -s "${HOME}/.g/env" ]]; then
+    # Source gvm env - temporarily disable set -u for GOPATH
+    (set +u; source "$HOME/.g/env") 2>/dev/null || true
+  fi
+  export PATH="$HOME/.local/bin:$PATH"
+}
+
+# Check if Go is installed via gvm
+gvm_go_installed() {
+  gvm_activate
+  command -v go &>/dev/null
+}
+
+##------------------------------------------------------------------------------
+## Uninstall Functions
+##------------------------------------------------------------------------------
+
+uninstall_neovim() {
+  if sudo -n true 2>/dev/null; then
+    sudo rm -rf /opt/nvim /usr/local/bin/nvim /usr/bin/vi
+    sudo update-alternatives --remove editor /usr/bin/vim.basic 2>/dev/null || true
+  else
+    rm -rf "$HOME/.local/nvim" "$HOME/.local/bin/nvim"
+  fi
+  log_info "Neovim uninstalled"
+}
+
+uninstall_volta() {
+  for tool in node pnpm yarn bun; do volta_tool_installed "$tool" && volta uninstall "$tool" 2>/dev/null; done
+  rm -rf "$HOME/.volta"
+  sed -i '/VOLTA_HOME/d; /\.volta\/bin/d' ~/.zshrc 2>/dev/null || true
+  log_info "Volta uninstalled"
+}
+
+uninstall_gvm() {
+  rm -rf "$HOME/.g" "$HOME/.groot" "$HOME/.local/bin/gvm"
+  sed -i '/# gvm shell setup/,/^\s*$/d; /G_MIRROR.*golang/d; /\.g\/env/d; /HOME.*\.local\/bin/d' ~/.zshrc 2>/dev/null || true
+  log_info "gvm uninstalled"
 }
 
 ##------------------------------------------------------------------------------
 ## Setup Functions
 ##------------------------------------------------------------------------------
 
-# Setup system dependencies (package manager and base packages)
 setup_system_deps() {
+  log_info "Setting up system dependencies..."
+
   if grep -qi kali /etc/os-release 2>/dev/null; then
-    echo "==> Detected Kali Linux"
-    backup_sources_list
-    sudo sed -i 's/^deb/# deb/g' /etc/apt/sources.list || { echo "Failed to modify sources.list"; exit 1; }
-    sudo sed -i '$a\deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' /etc/apt/sources.list || { echo "Failed to add sources.list entry"; exit 1; }
-    sudo apt update || { echo "Failed to update apt"; exit 1; }
-    sudo apt install -y git tmux tree cmake gcc zsh python3-pip \
-      ripgrep fd-find \
-      build-essential \
-      luarocks \
-      ghostscript \
-      texlive-base texlive-binaries texlive-bibtex-extra biber latexmk \
-      zathura zathura-pdf-poppler \
-      lazygit \
-      || { echo "Failed to install dependencies"; exit 1; }
-  else
-    echo "==> Detected Ubuntu"
-    sudo apt update || { echo "Failed to update apt"; exit 1; }
-    sudo apt install -y git tmux tree cmake gcc zsh python3-pip \
-      ripgrep fd-find \
-      build-essential \
-      luarocks \
-      ghostscript \
-      texlive-base texlive-binaries texlive-bibtex-extra biber latexmk \
-      zathura zathura-pdf-poppler \
-      lazygit \
-      || { echo "Failed to install dependencies"; exit 1; }
+    log_info "Detected Kali Linux"
+    # Check if apt sources need updating
+    if ! grep -q 'mirrors.tuna.tsinghua.edu.cn' /etc/apt/sources.list 2>/dev/null; then
+      log_info "Updating Kali apt sources..."
+      local sources_list="/etc/apt/sources.list"
+      local temp_sources
+      sudo cp "$sources_list" "${sources_list}.backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+      temp_sources=$(mktemp)
+      trap "sudo mv '${sources_list}.backup-'* '$sources_list' 2>/dev/null || true; rm -f '$temp_sources'" RETURN
+
+      sudo sed 's/^deb/# deb/g' "$sources_list" > "$temp_sources" 2>/dev/null || true
+      echo 'deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' | sudo tee -a "$temp_sources" > /dev/null 2>/dev/null || true
+      sudo mv "$temp_sources" "$sources_list" 2>/dev/null || true
+      trap - RETURN
+    fi
   fi
+
+  # Check if we can use sudo
+  if ! sudo -n true 2>/dev/null; then
+    log_warn "sudo not available, skipping system package installation"
+    log_info "Please install required packages manually if needed"
+    return 0
+  fi
+
+  # Install packages (continue on error for optional packages)
+  sudo apt update || true
+  sudo apt install -y git tmux tree cmake gcc zsh python3-pip ripgrep fd-find build-essential \
+    luarocks ghostscript texlive-base texlive-binaries texlive-bibtex-extra biber latexmk \
+    zathura zathura-pdf-poppler lazygit 2>/dev/null || log_warn "Some packages failed to install"
 }
 
-# Setup git configuration and proxy
-setup_git_account() {
-  echo "==> Git global setting"
+setup_proxy() {
+  [[ "$PROXY" == "-" ]] && log_info "Proxy disabled" && return 0
+
+  local proxy_line="export http_proxy=\"$PROXY\" https_proxy=\"$PROXY\""
+
+  append_zshrc '# Proxy configuration' '# Proxy'
+  append_zshrc "$proxy_line" "export http_proxy="
+
+  export http_proxy="$PROXY" https_proxy="$PROXY"
+  log_info "Proxy configured: $PROXY"
+}
+
+setup_git() {
+  log_info "Setting up git..."
   git config --global alias.st status
   git config --global alias.cmt commit
   git config --global alias.ck checkout
   git config --global credential.helper store
-  echo "==> Done"
+
+  [[ "$PROXY" != "-" ]] && git config --global http.proxy "$PROXY"
 }
 
-# Setup tmux with ohmytmux configuration
 setup_tmux() {
-  echo "==> Install ohmytmux"
-  if [[ -d ~/.tmux ]]; then
-    echo "==> ~/.tmux exists, skipping..."
-  else
-    git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
-    ln -s -f .tmux/.tmux.conf ~/.tmux.conf
-    echo
-    if is_wsl; then
-      echo "==> The script sudo systemd-tmpfiles --create will be helpful when error creating /run/tmux/1000 No such file or directory was catched under WSL"
-      echo "==> Or just change add export TMUX_TMPDIR='/tmp' into .zshrc to change the default tmux tmp directory"
-    fi
-    echo "==> Done"
-  fi
+  log_info "Setting up tmux..."
+  [[ -d ~/.tmux ]] && log_info "tmux already configured" && return 0
+
+  git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
+  ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+
+  is_wsl && log_info "Tip: For tmux errors, add 'export TMUX_TMPDIR=/tmp' to .zshrc"
 }
 
-# Setup zsh with ohmyzsh and plugins
 setup_zsh() {
-  echo "==> Install ohmyzsh and plugins"
-  if [[ -d ~/.oh-my-zsh ]]; then
-    echo "==> ~/.oh-my-zsh exists, skipping..."
+  log_info "Setting up zsh..."
+  [[ -d ~/.oh-my-zsh ]] && log_info "zsh already configured" && return 0
+
+  git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
+  cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
+  if chsh -s /bin/zsh 2>/dev/null; then
+    log_info "Default shell changed to zsh"
   else
-    git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
-    cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-    chsh -s /bin/zsh
-    sed -i 's/ZSH_THEME=".\+"/ZSH_THEME="bira"/' ~/.zshrc
-    sed -i '$a\set -o vi' ~/.zshrc
-    echo "==> Done"
+    log_warn "Could not change default shell. Run 'chsh -s /bin/zsh' manually."
   fi
+  sed -i 's/ZSH_THEME=".*"/ZSH_THEME="bira"/' ~/.zshrc
 }
 
-# Setup git-extras for additional git commands
+# Setup shell tools and enhancements
+setup_shell_tools() {
+  log_info "Setting up shell tools..."
+
+  # Vi mode for both bash and zsh
+  append_zshrc '# Enable vi mode' '# Vi mode'
+  append_zshrc 'set -o vi' 'set -o vi'
+
+  # Zsh-specific settings
+  append_zshrc '# Zsh enhancements' 'Zsh enhancements'
+  append_zshrc 'bindkey -v' 'bindkey -v'
+  append_zshrc 'export EDITOR="nvim"' 'export EDITOR='
+  append_zshrc 'export VISUAL="nvim"' 'export VISUAL='
+
+  # History settings
+  append_zshrc '# History settings' 'History settings'
+  append_zshrc 'HISTSIZE=10000' 'HISTSIZE='
+  append_zshrc 'SAVEHIST=10000' 'SAVEHIST='
+  append_zshrc 'HISTFILE=~/.zsh_history' 'HISTFILE='
+  append_zshrc 'setopt HIST_IGNORE_DUPS HIST_FIND_NO_DUPS HIST_IGNORE_SPACE' 'HIST_IGNORE_DUPS'
+
+  # Useful aliases
+  append_zshrc '# Useful aliases' 'Useful aliases'
+  append_zshrc "alias ..='cd ..'" 'alias ..='
+  append_zshrc "alias ...='cd ../..'" 'alias ...='
+  append_zshrc "alias la='ls -la'" 'alias la='
+  append_zshrc "alias ll='ls -lah'" 'alias ll='
+
+  log_info "Shell tools configured"
+}
+
 setup_git_extras() {
-  echo "==> Install git-extras"
+  log_info "Setting up git-extras..."
   mkdir -p ~/Project
-  if [[ -d ~/Project/git-extras ]]; then
-    echo "==> ~/Project/git-extras exists, skipping..."
-  else
-    git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras || { echo "Failed to clone git-extras"; exit 1; }
-    grep -q 'git-extras-completion' ~/.zshrc || sed -i '$a\source ~/Project/git-extras/etc/git-extras-completion.zsh' ~/.zshrc
-    echo "==> Done"
-  fi
+  [[ -d ~/Project/git-extras ]] && log_info "git-extras already configured" && return 0
+
+  git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras
+  append_zshrc 'source ~/Project/git-extras/etc/git-extras-completion.zsh' 'git-extras-completion'
 }
 
-# Setup volta (Node.js version manager) and package managers
 setup_volta() {
-  echo "==> Install node version manager (Volta) and package managers"
-  if [[ -d ~/.volta ]]; then
-    echo "==> ~/.volta exists, skipping..."
-  else
-    curl https://get.volta.sh | bash
-    export VOLTA_HOME="$HOME/.volta"
-    [[ ":$PATH:" == *":$VOLTA_HOME/bin:"* ]] || export PATH="$VOLTA_HOME/bin:$PATH"
-    volta install node || { echo "Failed to install node"; exit 1; }
-    volta install pnpm || { echo "Failed to install pnpm"; exit 1; }
-    volta install yarn || { echo "Failed to install yarn"; exit 1; }
-    volta install bun || { echo "Failed to install bun"; exit 1; }
-    volta install pi || { echo "Failed to install pi"; exit 1; }
-    echo "==> Done"
-  fi
-}
+  [[ "$REINSTALL_TOOL" == "volta" ]] && volta_is_installed && uninstall_volta
+  volta_is_installed && log_info "Volta installed: $(volta --version)" && return 0
 
-# Setup g (Go version manager) and install latest Go
-setup_go() {
-  echo "==> Install g (Go version manager)"
-  if [[ -d ~/.g ]]; then
-    echo "==> ~/.g exists, skipping..."
-  else
-    # Use China mirror for faster download in certain regions
-    export G_MIRROR="https://golang.google.cn/dl/"
-    curl -sSL https://raw.githubusercontent.com/voidint/g/master/install.sh | bash || { echo "Failed to install g"; exit 1; }
-    echo "==> Done"
-  fi
+  log_info "Installing Volta..."
+  download_and_execute "https://get.volta.sh" "Volta"
 
-  # Source the g environment for current session
-  source "$HOME/.g/env" 2>/dev/null || true
+  export VOLTA_HOME="$HOME/.volta"
+  export PATH="$VOLTA_HOME/bin:$PATH"
 
-  # Add g setup to zshrc if not already present
-  if ! grep -qF '# g shell setup' ~/.zshrc 2>/dev/null; then
-    cat >> ~/.zshrc <<'EOF'
-
-# g shell setup
-export G_MIRROR="https://golang.google.cn/dl/"
-[ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"
-EOF
-  else
-    echo "==> g shell setup already in zshrc, skipping..."
-  fi
-
-  # Install latest Go version
-  echo "==> Install latest Go version"
-  g install latest || { echo "Failed to install latest Go"; exit 1; }
-  echo "==> Done"
-}
-
-# Setup vim and neovim configuration
-setup_vim() {
-  local nvim_version="${1:-0.12.1}"
-  echo "==> Initialize vimrc"
-  mkdir -p ~/.vim/autoload
-  curl --max-time 60 -o ~/.vim/autoload/plug.vim --create-dirs https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/26229fb23962d66043af94e9c09a64ec1d934cd5/plug.vim
-  curl --max-time 60 -o ~/.vimrc https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/f1ef76e6788929f5fe80294b55306bdada48dfe2/vimrc
-  echo "==> You would better to install the plugins by yourself"
-  echo "==> 1. :PlugInstall"
-  echo "==> 2. :CocInstall coc-tsserver coc-rome coc-eslint coc-prettier coc-json coc-git coc-cmake coc-snippets coc-jedi"
-  echo "==> 3. Optional: zypper install vim-data when your openSUSE is a windows-subsystem"
-  echo "==> Done"
-
-  echo "==> Install neovim v${nvim_version}"
-  # Architecture check for neovim
-  if [[ $(uname -m) != "x86_64" ]]; then
-    echo "Unsupported architecture: $(uname -m). Neovim x86_64 binary required."
-    echo "Please download manually from https://github.com/neovim/neovim/releases"
-    exit 1
-  fi
-
-  mkdir -p ~/Download
-  cd ~/Download
-  [[ -f nvim-linux-x86_64.tar.gz ]] && rm -f nvim-linux-x86_64.tar.gz
-  curl -fsSL -o nvim-linux-x86_64.tar.gz "https://github.com/neovim/neovim/releases/download/v${nvim_version}/nvim-linux-x86_64.tar.gz" || { echo "Failed to download neovim v${nvim_version}"; exit 1; }
-  sudo rm -rf /opt/nvim
-  tar -xzf nvim-linux-x86_64.tar.gz
-  sudo mv nvim-linux-x86_64 /opt/nvim
-  cd -
-  [[ -f /usr/bin/vi ]] && sudo rm /usr/bin/vi
-  [[ -f /usr/local/bin/nvim ]] && sudo rm /usr/local/bin/nvim
-  sudo ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim
-  sudo ln -s /opt/nvim/bin/nvim /usr/bin/vi
-  if [[ -d ~/.config/nvim ]]; then
-    echo "==> ~/.config/nvim exists, removing..."
-    rm -rf ~/.config/nvim
-  fi
-  git clone --depth 1 https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
-  echo "==> Done"
-
-  echo "==> Update default editor as /usr/bin/vim.basic"
-  sudo update-alternatives --set editor /usr/bin/vim.basic
-  echo "==> Once failed try \"sudo update-alternatives --config editor\""
-}
-
-# Setup pyenv (Python version manager) and Python tools
-setup_pyenv() {
-  # Install pyenv for Python version management
-  # see https://github.com/pyenv/pyenv
-  [[ -f "$HOME/.pyenv" ]] && sudo rm "$HOME/.pyenv"
-  curl --max-time 60 -fsSL https://pyenv.run | bash || { echo "Failed to install pyenv"; exit 1; }
-  grep -q 'PYENV_ROOT' ~/.zshrc || echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-  grep -q '$PYENV_ROOT/bin' ~/.zshrc || echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-  grep -q 'pyenv init' ~/.zshrc || echo 'eval "$(pyenv init - zsh)"' >> ~/.zshrc
-
-  # Source pyenv for current session
-  export PYENV_ROOT="$HOME/.pyenv"
-  export PATH="$PYENV_ROOT/bin:$PATH"
-  eval "$(pyenv init - zsh)"
-
-  # Install latest Python version (skip if already installed)
-  if pyenv versions | grep -q '3.12'; then
-    echo "==> Python 3.12 already installed, skipping..."
-  else
-    pyenv install 3.12 || { echo "Failed to install Python 3.12"; exit 1; }
-  fi
-  pyenv global 3.12 || { echo "Failed to set global Python version"; exit 1; }
-
-  # Install uv
-  curl -LsSf https://astral.sh/uv/install.sh | sh || { echo "Failed to install uv"; exit 1; }
-}
-
-##------------------------------------------------------------------------------
-## Main Entry Point
-##------------------------------------------------------------------------------
-
-usage() {
-  echo "Usage: $0 [OPTIONS]"
-  echo "Options:"
-  echo "  --neovim-version VERSION, -neo VERSION  Neovim version to install (default: 0.12.1)"
-  echo "  -h, --help                            Show this help message"
-  exit 0
-}
-
-parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -h|--help)
-        usage
-        ;;
-      -neo|--neovim-version)
-        if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
-          echo "Error: --neovim-version requires a value" >&2
-          exit 1
-        fi
-        NVIM_VERSION="$2"
-        shift 2
-        ;;
-      -*)
-        echo "Unknown option: $1" >&2
-        exit 1
-        ;;
-      *)
-        echo "Unknown argument: $1" >&2
-        exit 1
-        ;;
-    esac
+  for tool in node pnpm yarn bun; do
+    volta_tool_installed "$tool" && log_info "$tool already installed" && continue
+    [[ "$tool" == "node" ]] && volta install node || volta install "$tool" 2>/dev/null || log_warn "Failed to install $tool"
   done
 }
 
-NVIM_VERSION="0.12.1"
+setup_gvm() {
+  local gvm_fresh_install="false"
 
-install() {
-  parse_args "$@"
+  [[ "$REINSTALL_TOOL" == "gvm" ]] && gvm_is_installed && uninstall_gvm
 
-  setup_system_deps
-  setup_git_account
-  setup_tmux
-  setup_zsh
-  setup_git_extras
-  setup_volta
-  setup_go
-  setup_vim "$NVIM_VERSION"
-  # setup_pyenv
+  if gvm_is_installed; then
+    gvm_activate
+    log_info "gvm installed: $(gvm --version)"
+    if gvm_go_installed; then
+      log_info "Go installed: $(go version)"
+      return 0
+    fi
+    log_info "gvm exists but Go not installed, installing..."
+    gvm_fresh_install="true"
+  else
+    log_info "Installing gvm..."
+    export G_MIRROR="$GVM_MIRROR"
+    download_and_execute "https://raw.githubusercontent.com/voidint/g/master/install.sh" "gvm"
 
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$HOME/.g/bin/g" "$HOME/.local/bin/gvm"
+    gvm_activate
+    gvm_fresh_install="true"
+  fi
+
+  # Configure zshrc only on fresh install
+  if [[ "$gvm_fresh_install" == "true" ]]; then
+    append_zshrc '# gvm shell setup' '# gvm shell setup'
+    append_zshrc "export G_MIRROR=\"$GVM_MIRROR\"" 'G_MIRROR'
+    append_zshrc '[ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"' '.g/env'
+    append_zshrc 'export PATH="$HOME/.local/bin:$PATH"' '.local/bin:$PATH'
+  fi
+
+  log_info "Installing Go..."
+  gvm install latest 2>&1 || true
+  # gvm install returns 1 even on success, verify by checking version
+  export GOROOT="${HOME}/.g/go"
+  export GOPATH="${HOME}/go"
+  export PATH="${HOME}/.g/bin:${GOROOT}/bin:${GOPATH}/bin:$PATH"
+  if command -v go &>/dev/null; then
+    log_info "Go installed: $(go version)"
+  else
+    log_warn "Go installation may have failed"
+  fi
+}
+
+setup_neovim() {
+  [[ "$REINSTALL_TOOL" == "neovim" ]] && nvim_is_installed &>/dev/null && uninstall_neovim
+
+  if nvim_is_installed &>/dev/null; then
+    log_info "Neovim installed: $(nvim_is_installed)"
+    log_info "Skipping neovim installation (use --reinstall to force)"
+  else
+    log_info "Installing Neovim v${NVIM_VERSION}..."
+    [[ "$(uname -m)" != "x86_64" ]] && log_error "Unsupported architecture"
+
+    local download_dir="$HOME/Download"
+    mkdir -p "$download_dir"
+    cd "$download_dir"
+
+    curl -fsSL -o nvim-linux-x86_64.tar.gz \
+      "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-x86_64.tar.gz"
+
+    # Try system install first, fall back to user install
+    if sudo -n true 2>/dev/null; then
+      sudo rm -rf /opt/nvim
+      tar -xzf nvim-linux-x86_64.tar.gz
+      sudo mv nvim-linux-x86_64 /opt/nvim
+      sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+      sudo ln -sf /opt/nvim/bin/nvim /usr/bin/vi
+      sudo update-alternatives --set editor /usr/bin/vim.basic 2>/dev/null || true
+    else
+      log_info "Installing to user space (sudo not available)..."
+      rm -rf "$HOME/.local/nvim"
+      tar -xzf nvim-linux-x86_64.tar.gz
+      mv nvim-linux-x86_64 "$HOME/.local/nvim"
+      mkdir -p "$HOME/.local/bin"
+      ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
+      ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/vi"
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+    cd - > /dev/null
+  fi
+
+  log_info "Setting up neovim config..."
+  mkdir -p ~/.vim/autoload
+  curl --max-time 60 -o ~/.vim/autoload/plug.vim --create-dirs \
+    https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/plug.vim
+  curl --max-time 60 -o ~/.vimrc \
+    https://gist.githubusercontent.com/vanpipy/0597d3ee27a55ecf8f1ad20cc044024e/raw/vimrc
+
+  rm -rf ~/.config/nvim
+  git clone --depth 1 https://github.com/vanpipy/lazible-neo.git ~/.config/nvim
+
+  echo "==> Manual plugin setup:"
+  echo "    nvim +'PlugInstall --sync' +qa"
+  echo "    :CocInstall coc-tsserver coc-rome coc-eslint ..."
+}
+
+##------------------------------------------------------------------------------
+## Main
+##------------------------------------------------------------------------------
+
+usage() {
+  cat << EOF
+Usage: $SCRIPT_NAME [OPTIONS]
+
+Options:
+  --neovim-version VERSION  Neovim version (default: ${DEFAULT_NVIM_VERSION})
+  --reinstall TOOL          Reinstall tool (volta, gvm, neovim)
+  --proxy PROXY             Proxy (default: ${DEFAULT_PROXY}, use "-" to disable)
+  -h, --help               Show this help
+
+Proxy Protocols:
+  http://, https://, socks://, socks4://, socks5://
+
+Examples:
+  $SCRIPT_NAME
+  $SCRIPT_NAME --proxy -                              # Disable proxy
+  $SCRIPT_NAME --proxy http://192.168.1.1:8080       # HTTP proxy
+  $SCRIPT_NAME --proxy socks5://127.0.0.1:7890      # SOCKS5 proxy
+  $SCRIPT_NAME --neovim-version 0.10.0
+  $SCRIPT_NAME --reinstall neovim
+EOF
   exit 0
 }
 
-# Handle help flag before running install
-for arg in "$@"; do
-  case "$arg" in
-    -h|--help)
-      usage
-      ;;
-  esac
-done
+main() {
+  local NVIM_VERSION="$DEFAULT_NVIM_VERSION"
+  local PROXY="$DEFAULT_PROXY"
+  local REINSTALL_TOOL=""
 
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && install "$@"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) usage ;;
+      --neovim-version)
+        [[ -z "${2:-}" ]] && log_error "--neovim-version requires a value"
+        validate_version "$2" "neovim version"
+        NVIM_VERSION="$2"
+        shift 2
+        ;;
+      --reinstall)
+        [[ -z "${2:-}" ]] && log_error "--reinstall requires a value"
+        REINSTALL_TOOL="$2"
+        shift 2
+        ;;
+      --proxy)
+        [[ -z "${2:-}" ]] && log_error "--proxy requires a value"
+        validate_proxy "$2"
+        PROXY="$2"
+        shift 2
+        ;;
+      *) log_error "Unknown option: $1" ;;
+    esac
+  done
+
+  export NVIM_VERSION PROXY REINSTALL_TOOL
+
+  # Set proxy first - required for all network operations
+  setup_proxy
+
+  log_info "Starting setup... (Neovim: ${NVIM_VERSION}, Proxy: ${PROXY})"
+
+  setup_system_deps
+  setup_git
+  setup_tmux
+  setup_zsh
+  setup_shell_tools
+  setup_git_extras
+  setup_volta
+  setup_gvm
+  setup_neovim
+  # setup_pyenv  # Disabled by default
+
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Setup complete!"
+  echo ""
+  echo "  ⚠️  IMPORTANT: Exit this shell and open a new one to apply"
+  echo "     all environment changes (PATH, shell settings, etc.)"
+  echo ""
+  echo "  Or run: exec zsh"
+  echo "═══════════════════════════════════════════════════════════════"
+}
+
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"
