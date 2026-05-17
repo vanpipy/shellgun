@@ -48,10 +48,6 @@ validate_version() {
   [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || log_error "Invalid $2: '$1'. Expected semver format"
 }
 
-normalize_proxy() {
-  case "$1" in -|*|"") echo "$1" ;; http://*|https://*|socks*://*) echo "$1" ;; *) echo "http://$1" ;; esac
-}
-
 validate_proxy() {
   [[ "$1" == -* ]] && return 0
   [[ "$1" =~ ^(https?|socks[45]?):// ]] || log_error "Invalid proxy: '$1'. Must start with http://, https://, socks://, socks4://, or socks5://"
@@ -128,11 +124,12 @@ uninstall_vim_config() {
 
 uninstall_neovim() {
   uninstall_vim_config
+  rm -f "$HOME/.local/bin/nvim" "$HOME/.local/bin/vi"
   if sudo -n true 2>/dev/null; then
     sudo rm -rf /opt/nvim /usr/local/bin/nvim /usr/bin/vi
     sudo update-alternatives --remove editor /usr/bin/vim.basic 2>/dev/null || true
   else
-    rm -rf "$HOME/.local/nvim" "$HOME/.local/bin/nvim"
+    rm -rf "$HOME/.local/nvim"
   fi
   log_info "Neovim uninstalled"
 }
@@ -250,9 +247,9 @@ setup_shell_tools() {
 
 setup_git_extras() {
   log_info "Setting up git-extras..."
-  mkdir -p ~/Project
   [[ -d ~/Project/git-extras ]] && log_info "git-extras already configured" && return 0
 
+  mkdir -p ~/Project
   git clone --depth 1 https://github.com/tj/git-extras.git ~/Project/git-extras
   append_zshrc 'source ~/Project/git-extras/etc/git-extras-completion.zsh' 'git-extras-completion'
 }
