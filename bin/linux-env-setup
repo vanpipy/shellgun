@@ -206,11 +206,7 @@ setup_zsh() {
 
   git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
   cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
-  if chsh -s /bin/zsh 2>/dev/null; then
-    log_info "Default shell changed to zsh"
-  else
-    log_warn "Could not change default shell. Run 'chsh -s /bin/zsh' manually."
-  fi
+  chsh -s /bin/zsh
   sed -i 's/ZSH_THEME=".*"/ZSH_THEME="bira"/' ~/.zshrc
 }
 
