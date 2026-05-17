@@ -353,7 +353,9 @@ setup_neovim() {
       sudo mv nvim-linux-x86_64 /opt/nvim
       sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
       sudo ln -sf /opt/nvim/bin/nvim /usr/bin/vi
-      sudo update-alternatives --set editor /usr/bin/vim.basic 2>/dev/null || true
+      # Set nvim as default editor via update-alternatives
+      sudo update-alternatives --install /usr/bin/editor editor /opt/nvim/bin/nvim 100 2>/dev/null || true
+      sudo update-alternatives --set editor /opt/nvim/bin/nvim 2>/dev/null || true
     else
       log_info "Installing to user space (sudo not available)..."
       rm -rf "$HOME/.local/nvim"
