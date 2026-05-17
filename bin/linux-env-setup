@@ -20,7 +20,7 @@
 # Examples:
 #   ./linux-env-setup --proxy -                           # Disable proxy
 #   ./linux-env-setup --neovim-version 0.10.0            # Custom neovim
-#   ./linux-env-setup --reinstall neovim                 # Force reinstall
+#   ./linux-env-setup --reinstall neovim                 # Force reinstall neovim + config
 #
 # Requirements: Ubuntu/Kali Linux, sudo access, internet connection
 #
@@ -97,6 +97,8 @@ nvim_is_installed() {
   command_exists nvim && nvim --version 2>/dev/null | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+'
 }
 
+vim_config_is_installed() { [[ -d ~/.config/nvim ]] || [[ -f ~/.vimrc ]]; }
+
 volta_is_installed() { command_exists volta; }
 volta_tool_installed() { [[ -n "$(volta list "$1" 2>/dev/null)" ]]; }
 gvm_is_installed() { [[ -x "$HOME/.local/bin/gvm" ]]; }
@@ -119,7 +121,13 @@ gvm_go_installed() {
 ## Uninstall Functions
 ##------------------------------------------------------------------------------
 
+uninstall_vim_config() {
+  rm -rf ~/.vim ~/.vimrc ~/.config/nvim
+  log_info "Vim config uninstalled"
+}
+
 uninstall_neovim() {
+  uninstall_vim_config
   if sudo -n true 2>/dev/null; then
     sudo rm -rf /opt/nvim /usr/local/bin/nvim /usr/bin/vi
     sudo update-alternatives --remove editor /usr/bin/vim.basic 2>/dev/null || true
@@ -150,28 +158,10 @@ setup_system_deps() {
   log_info "Setting up system dependencies..."
 
   if grep -qi kali /etc/os-release 2>/dev/null; then
-    log_info "Detected Kali Linux"
-    # Check if apt sources need updating
-    if ! grep -q 'mirrors.tuna.tsinghua.edu.cn' /etc/apt/sources.list 2>/dev/null; then
-      log_info "Updating Kali apt sources..."
-      local sources_list="/etc/apt/sources.list"
-      local temp_sources
-      sudo cp "$sources_list" "${sources_list}.backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-      temp_sources=$(mktemp)
-      trap "sudo mv '${sources_list}.backup-'* '$sources_list' 2>/dev/null || true; rm -f '$temp_sources'" RETURN
-
-      sudo sed 's/^deb/# deb/g' "$sources_list" > "$temp_sources" 2>/dev/null || true
-      echo 'deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' | sudo tee -a "$temp_sources" > /dev/null 2>/dev/null || true
-      sudo mv "$temp_sources" "$sources_list" 2>/dev/null || true
-      trap - RETURN
-    fi
-  fi
-
-  # Check if we can use sudo
-  if ! sudo -n true 2>/dev/null; then
-    log_warn "sudo not available, skipping system package installation"
-    log_info "Please install required packages manually if needed"
-    return 0
+    log_info "Detected Kali Linux, updating apt sources..."
+    # Comment out existing deb lines and append Tsinghua mirror
+    sudo sed -i 's/^deb/# &/' /etc/apt/sources.list 2>/dev/null || true
+    echo 'deb https://mirrors.tuna.tsinghua.edu.cn/kali kali-rolling main non-free contrib non-free-firmware' | sudo tee -a /etc/apt/sources.list > /dev/null
   fi
 
   # Install packages (continue on error for optional packages)
@@ -334,7 +324,9 @@ setup_neovim() {
 
   if nvim_is_installed &>/dev/null; then
     log_info "Neovim installed: $(nvim_is_installed)"
-    log_info "Skipping neovim installation (use --reinstall to force)"
+    if vim_config_is_installed; then
+      log_info "Skipping neovim installation (use --reinstall to force)"
+    fi
   else
     log_info "Installing Neovim v${NVIM_VERSION}..."
     [[ "$(uname -m)" != "x86_64" ]] && log_error "Unsupported architecture"
@@ -369,7 +361,12 @@ setup_neovim() {
     cd - > /dev/null
   fi
 
-  log_info "Setting up neovim config..."
+  if vim_config_is_installed; then
+    log_info "Vim config installed (use --reinstall neovim to force)"
+    return 0
+  fi
+
+  log_info "Setting up vim config..."
   mkdir -p ~/.vim/autoload
   curl --max-time 60 -o ~/.vim/autoload/plug.vim --create-dirs \
     https://gist.githubusercontent.com/vanpipy/5466dc623d6c9ec124f997ab7e6f2c70/raw/plug.vim
@@ -381,7 +378,6 @@ setup_neovim() {
 
   echo "==> Manual plugin setup:"
   echo "    nvim +'PlugInstall --sync' +qa"
-  echo "    :CocInstall coc-tsserver coc-rome coc-eslint ..."
 }
 
 ##------------------------------------------------------------------------------
@@ -407,7 +403,7 @@ Examples:
   $SCRIPT_NAME --proxy http://192.168.1.1:8080       # HTTP proxy
   $SCRIPT_NAME --proxy socks5://127.0.0.1:7890      # SOCKS5 proxy
   $SCRIPT_NAME --neovim-version 0.10.0
-  $SCRIPT_NAME --reinstall neovim
+  $SCRIPT_NAME --reinstall neovim                    # Reinstall neovim + config
 EOF
   exit 0
 }
