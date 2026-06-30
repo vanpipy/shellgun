@@ -67,3 +67,7 @@ clean-speckit-configure:
 .PHONY: clean-security-configure
 clean-security-configure:
 	@rm -rf lib/
+
+.PHONY: test
+test:
+	@bash tests/linux-env-setup/setup_tmux.test.sh

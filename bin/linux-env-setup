@@ -62,6 +62,15 @@ append_zshrc() {
   echo "$line" >> ~/.zshrc
 }
 
+# Append to ~/.tmux.conf only if pattern not already present (idempotent)
+append_tmux_conf() {
+  local line="$1"
+  local pattern="${2:-${line}}"
+  [[ -z "$line" ]] && return 0
+  [[ -f ~/.tmux.conf ]] && grep -qF -- "$pattern" ~/.tmux.conf && return 0
+  echo "$line" >> ~/.tmux.conf
+}
+
 command_exists() { command -v "$1" &>/dev/null; }
 
 download_and_execute() {
@@ -192,12 +201,24 @@ setup_git() {
 
 setup_tmux() {
   log_info "Setting up tmux..."
-  [[ -d ~/.tmux ]] && log_info "tmux already configured" && return 0
 
-  git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
-  ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+  if [[ ! -d ~/.tmux ]]; then
+    git clone --depth 1 https://github.com/gpakosz/.tmux.git ~/.tmux
+    ln -s -f .tmux/.tmux.conf ~/.tmux.conf
+    is_wsl && log_info "Tip: For tmux errors, add 'export TMUX_TMPDIR=/tmp' to .zshrc"
+  else
+    log_info "tmux already configured"
+  fi
 
-  is_wsl && log_info "Tip: For tmux errors, add 'export TMUX_TMPDIR=/tmp' to .zshrc"
+  # Custom shellgun tmux config — each line is independently idempotent
+  # so a partial edit self-heals on re-run. clip.exe targets WSL (Windows
+  # host clipboard); harmless no-op on native Linux.
+  append_tmux_conf 'set -g set-clipboard on'          'set -g set-clipboard on'
+  append_tmux_conf 'set -g mouse on'                  'set -g mouse on'
+  append_tmux_conf 'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "clip.exe"' \
+                   'copy-mode-vi y send-keys -X copy-pipe-and-cancel'
+  append_tmux_conf 'bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "clip.exe"' \
+                   'MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel'
 }
 
 setup_zsh() {
