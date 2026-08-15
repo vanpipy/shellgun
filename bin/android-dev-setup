@@ -18,6 +18,11 @@
 #   --yes                         Accept all licenses non-interactively
 #   --help                        Show this help message
 #
+# Environment:
+#   - http(s)_proxy / HTTP(S)_PROXY are honoured automatically
+#   - If unset, the proxy is auto-detected from `git config --global http(s).proxy`
+#   - JAVA_HOME is set automatically (via SDKMAN) before sdkmanager runs
+#
 # Examples:
 #   ./bin/android-dev-setup                                    # Use defaults
 #   ./bin/android-dev-setup --android-version android-35       # Override API level
@@ -524,7 +529,100 @@ install_sdk_components() {
 }
 
 # -----------------------------------------------------------------------------
+# setup_proxy - Detect and export proxy environment variables
+#
+# Order of precedence:
+#   1. HTTPS_PROXY / https_proxy already set in the env
+#   2. HTTP_PROXY  / http_proxy  already set in the env
+#   3. git config --global http.proxy (common when only git uses a proxy)
+#
+# curl and SDKMAN both respect http(s)_proxy; sdkmanager is a Java app that
+# uses Java networking (see JAVA_TOOL_OPTIONS below if it ever needs proxy).
+# -----------------------------------------------------------------------------
+setup_proxy() {
+    # If HTTPS proxy is already exported, nothing to do
+    if [[ -n "${HTTPS_PROXY:-}" || -n "${https_proxy:-}" || -n "${HTTP_PROXY:-}" || -n "${http_proxy:-}" ]]; then
+        debug "Proxy already configured in environment"
+        return 0
+    fi
+
+    # Detect from git config (single source of truth on many dev machines)
+    local git_http_proxy git_https_proxy
+    git_http_proxy=$(git config --global --get http.proxy 2>/dev/null || true)
+    git_https_proxy=$(git config --global --get https.proxy 2>/dev/null || true)
+
+    local detected="${git_https_proxy:-${git_http_proxy:-}}"
+
+    if [[ -n "$detected" ]]; then
+        export http_proxy="$detected"
+        export https_proxy="$detected"
+        export HTTP_PROXY="$detected"
+        export HTTPS_PROXY="$detected"
+        info "Detected proxy from git config: $detected"
+    else
+        debug "No proxy configured"
+    fi
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# setup_sdkman - Install SDKMAN itself (separated from Java install so the
+# proxy-aware Java install runs after SDKMAN is sourced)
+# -----------------------------------------------------------------------------
+setup_sdkman() {
+    if [[ -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
+        info "SDKMAN already installed"
+    else
+        info "Installing SDKMAN..."
+
+        if ! command -v curl &> /dev/null; then
+            error "curl not available, cannot install SDKMAN"
+            return 1
+        fi
+
+        # --max-time guards against the install hanging behind a flaky proxy.
+        # SDKMAN's installer can take a couple of minutes; 180s is generous.
+        if curl -fsSL --max-time 180 https://get.sdkman.io | bash > /tmp/sdkman_install.log 2>&1; then
+            success "SDKMAN installed"
+            rm -f /tmp/sdkman_install.log
+        else
+            error "Failed to install SDKMAN (see /tmp/sdkman_install.log)"
+            return 1
+        fi
+
+        if [[ ! -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
+            error "SDKMAN installation did not create expected files"
+            return 1
+        fi
+    fi
+
+    # Source SDKMAN so `sdk` and the JDK shims work in this script invocation
+    source_sdkman
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# source_sdkman - Source SDKMAN's init script
+#
+# SDKMAN's sdkman-init.sh is not safe under `set -u` — it references several
+# SDKMAN_* variables that may not be defined yet (e.g. SDKMAN_CANDIDATES_API).
+# Temporarily disable nounset around the source to avoid spurious failures.
+# -----------------------------------------------------------------------------
+source_sdkman() {
+    local init="${HOME}/.sdkman/bin/sdkman-init.sh"
+    [[ -f "$init" ]] || return 1
+    set +u
+    # shellcheck disable=SC1091
+    source "$init"
+    set -u
+}
+
+# -----------------------------------------------------------------------------
 # setup_java - Install Java JDK via SDKMAN
+#
+# Prerequisite: SDKMAN must be installed (call setup_sdkman first).
+# Exports JAVA_HOME and prepends $JAVA_HOME/bin to PATH so sdkmanager
+# (a Java app) can run in the same script invocation.
 # -----------------------------------------------------------------------------
 setup_java() {
     if [[ "${SKIP_JAVA}" == true ]]; then
@@ -532,76 +630,43 @@ setup_java() {
         return 0
     fi
 
-    # Check if Java is already installed and accessible
-    if command -v java &> /dev/null; then
-        local java_version
-        java_version=$(java -version 2>&1 | head -1)
-        info "Java already available: $java_version"
-        return 0
-    fi
-
-    # Check if SDKMAN is already installed
-    if [[ -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
-        info "SDKMAN already installed, installing Java ${JAVA_VERSION}..."
-
-        source "${HOME}/.sdkman/bin/sdkman-init.sh"
-
-        # Check if this specific version is installed
-        if sdk list java 2>/dev/null | grep -q "${JAVA_VERSION}"; then
-            if sdk current java 2>/dev/null | grep -q "${JAVA_VERSION}"; then
-                success "Java ${JAVA_VERSION} is active"
-                return 0
-            fi
-
-            info "Installing Java ${JAVA_VERSION}..."
-            if sdk install java "${JAVA_VERSION}" -y 2>&1 | tee /tmp/java_install.log; then
-                success "Java ${JAVA_VERSION} installed"
-                rm -f /tmp/java_install.log
-                return 0
-            else
-                warn "Failed to install Java ${JAVA_VERSION}"
-                return 1
-            fi
-        else
-            warn "Java ${JAVA_VERSION} not found in SDKMAN repository"
-            return 1
-        fi
-    fi
-
-    # Install SDKMAN
-    info "Installing SDKMAN..."
-
-    if command -v curl &> /dev/null; then
-        if curl -s "https://get.sdkman.io" | bash 2>&1 | tee /tmp/sdkman_install.log; then
-            success "SDKMAN installed"
-            rm -f /tmp/sdkman_install.log
-        else
-            error "Failed to install SDKMAN"
-            return 1
-        fi
-    else
-        error "curl not available, cannot install SDKMAN"
-        return 1
-    fi
-
-    # Verify SDKMAN installation
+    # Source SDKMAN (no-op if already sourced this run)
     if [[ ! -f "${HOME}/.sdkman/bin/sdkman-init.sh" ]]; then
-        error "SDKMAN installation failed"
+        error "SDKMAN is not installed; cannot install Java. Run setup_sdkman first."
         return 1
     fi
+    source_sdkman
 
-    # Initialize SDKMAN and install Java
-    source "${HOME}/.sdkman/bin/sdkman-init.sh"
-
-    info "Installing Java ${JAVA_VERSION}..."
-    if sdk install java "${JAVA_VERSION}" -y 2>&1 | tee /tmp/java_install.log; then
-        success "Java ${JAVA_VERSION} installed successfully"
-        rm -f /tmp/java_install.log
-        return 0
+    # Canonical SDKMAN "is this JDK installed?" check: the candidate directory
+    # exists. (sdk list java shows the catalog, which always has the version,
+    # and sdk current java only checks the default — both miss the case where
+    # the version is installed under a different default.)
+    if [[ -d "${HOME}/.sdkman/candidates/java/${JAVA_VERSION}" ]]; then
+        info "Java ${JAVA_VERSION} already installed via SDKMAN"
+        # Make sure it is the default; ignore failure (e.g. already current)
+        sdk default java "${JAVA_VERSION}" > /dev/null 2>&1 || true
     else
-        error "Failed to install Java ${JAVA_VERSION}"
+        info "Installing Java ${JAVA_VERSION} via SDKMAN..."
+        if ! sdk install java "${JAVA_VERSION}" -y 2>&1 | tee /tmp/java_install.log; then
+            error "Failed to install Java ${JAVA_VERSION} (see /tmp/java_install.log)"
+            return 1
+        fi
+        rm -f /tmp/java_install.log
+        success "Java ${JAVA_VERSION} installed"
+    fi
+
+    # Export JAVA_HOME + PATH so sdkmanager (and anything else Java-based)
+    # works in the rest of this script invocation.
+    local java_home="${HOME}/.sdkman/candidates/java/current"
+    if [[ ! -d "$java_home" ]]; then
+        error "Java candidate directory missing after install: $java_home"
         return 1
     fi
+    export JAVA_HOME="$java_home"
+    export PATH="${JAVA_HOME}/bin:${PATH}"
+
+    info "Java active: $(java -version 2>&1 | head -1)"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -701,12 +766,26 @@ main() {
     echo ""
 
     # Execute setup steps
+    #
+    # Order matters:
+    #   1. setup_proxy first so all subsequent curl/sdk calls use the proxy
+    #   2. setup_sdkman + setup_java BEFORE install_sdk_components because
+    #      sdkmanager is a Java app and refuses to run without JAVA_HOME
+    #   3. Export ANDROID_HOME / PATH for the *current* shell right after
+    #      download_commandlinetools so sdkmanager is reachable for every
+    #      step that follows. configure_environment only writes to the rc file,
+    #      which does not affect this script invocation.
     check_prerequisites
+    setup_proxy
     download_commandlinetools || exit 1
     configure_environment
+    export ANDROID_HOME="${SDK_ROOT}"
+    export ANDROID_SDK_ROOT="${ANDROID_HOME}"
+    export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+    setup_sdkman || exit 1
+    setup_java || exit 1
     accept_licenses
     install_sdk_components || exit 1
-    setup_java || warn "Java setup had issues"
     verify_installation
 
     echo ""
